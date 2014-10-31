@@ -89,7 +89,7 @@ void udpStopAndWait(int soc)
 int main(int argc, char* argv[]) {
     // check the arguments
     if (argc != 3) {
-        printf("Usage: ./%s <receiver ip-address> <receiver port>\n",argv[0]);
+        printf("Usage: %s <receiver ip-address> <receiver port>\n",argv[0]);
         exit(1);
     }
     

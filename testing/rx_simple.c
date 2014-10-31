@@ -76,7 +76,7 @@ void udpStopAndWait(int soc)
 int main(int argc, char* argv[]) {
     // check the arguments
     if (argc != 2) {
-        printf("Usage: ./%s <local port>\n", argv[0]);
+        printf("Usage: %s <local port>\n", argv[0]);
         exit(1);
     }
     
