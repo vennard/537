@@ -1,7 +1,7 @@
 # JLV - 10/17/14
 # Early version - use only as framework example
 
-#CFLAGS= -Wall -Wextra -Werror
+CFLAGS= -Wall -Wextra -Werror
 
 all: server client repeater
 

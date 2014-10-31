@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+
 int main(int argc, char *argv[]) {
     if (argc!=3 && argc!=5) {
         printf("Usage: %s our-ip our-port send-to-ip send-to-port\n",argv[0]);
@@ -18,7 +20,8 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in a;
     a.sin_family=AF_INET;
-    a.sin_addr.s_addr=inet_addr(argv[1]); a.sin_port=htons(atoi(argv[2]));
+    a.sin_addr.s_addr=inet_addr(argv[1]); 
+	 a.sin_port=htons(atoi(argv[2]));
     if(bind(os,(struct sockaddr *)&a,sizeof(a)) == -1) {
         printf("Can't bind our address (%s:%s)\n", argv[1], argv[2]);
         exit(1); }
@@ -26,10 +29,11 @@ int main(int argc, char *argv[]) {
     if(argc==5) { a.sin_addr.s_addr=inet_addr(argv[3]); a.sin_port=htons(atoi(argv[4])); }
 
     struct sockaddr_in sa;
-    struct sockaddr_in da; da.sin_addr.s_addr=0;
+    struct sockaddr_in da; 
+	 da.sin_addr.s_addr=0;
     while(1) {
         char buf[65535];
-        int sn=sizeof(sa);
+		  socklen_t sn=sizeof(sa);
         int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
         if(n<=0) continue;
 
