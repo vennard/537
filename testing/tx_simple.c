@@ -17,8 +17,6 @@
 #include <errno.h>
 
 #define MESLEN 128 // length of inbound/outbound messages
-#define ACKLEN 20 // length of ACKs
-#define TIMEOUT 2
 
 
 int udpInit(char* receiverIp, char* receiverPort) {
@@ -61,89 +59,29 @@ int udpInit(char* receiverIp, char* receiverPort) {
     return -1;
   }
     
-  // set timeout
-  struct timeval time;
-  time.tv_sec = TIMEOUT;
-  time.tv_usec = 0;
-  if (setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, &time, sizeof(time)) != 0) 
-  { 
-    perror("Timeout could not be set\n");
-    close(soc);
-    return -1;
-  }
-  
   printf("UDP initialized, sending packets to %s, port %u\n",receiverIp,portInt);
   return soc;
 }
 
 
-int getAck(char* buf, int rxRes, int bufLen)
-{
-  // timeout -> return -1
-  // invalid packet -> return 0
-  // otherwise return the received ACK
-  
-  if (rxRes < 0) return -1; // timeout
-  if (rxRes != bufLen) return 0; // damaged packet
-  if (strncmp(buf,"ACK=",4) != 0) return 0; // not the desired structure
-  
-  // parse the ACK
-  unsigned int ack = strtoul(buf+4, NULL, 10); 
-  if (ack==0 || ack==ULONG_MAX) return 0;
-  
-  return ack;  
-}
-
 
 void udpStopAndWait(int soc)
 {
   char bufOut[MESLEN]; // outbound messages buffer
-  char bufIn[ACKLEN]; // inbound ACKs buffer
-  
-  unsigned int seqNum = 1;
-  unsigned int ackNum;
   int txRes, rxRes;
   
   while (1)
   {    
-    memset(bufOut, seqNum, sizeof(bufOut)); // put some "data" in the output buffer
-    sprintf(bufOut, "SEQ=%u#", seqNum); // insert the seq number
+    sprintf(bufOut, "!ATEAM TEST PACKET!"); 
     
     // send a packet
     txRes = write(soc, bufOut, sizeof(bufOut));
     if (txRes == -1)
     {
       perror("Warning: Failed to send a packet, trying again\n");
-      sleep(TIMEOUT); // wait for a while
       continue; // try again
-    } else {
-      printf("SEQ=%u sent\n",seqNum);
-    }
-    
-    // receive a response
-    rxRes = read(soc, bufIn, sizeof(bufIn));   
-    ackNum = getAck(bufIn, rxRes, sizeof(bufIn));
-    if (ackNum == -1)
-    {      
-      if (errno==EAGAIN || errno==EWOULDBLOCK)
-      {
-        printf("Timeout reached for SEQ=%u\n",seqNum);
-      } else {
-        perror("Warning: Receive error, trying again\n");
-        sleep(TIMEOUT); // wait for a while       
-      }
-    }    
-    else if (ackNum == 0)
-    {
-      perror("Warning: Received an invalid packet, ignoring it\n");
-    } else {
-      printf("ACK=%u received\n",ackNum);
-      if (seqNum < ackNum) // a new highest ACK number?
-      {
-        // update SEQ number
-        seqNum = ackNum;
-      }
-    }          
+    } 
+   sleep(2); 
   }
 }
 
@@ -151,7 +89,7 @@ void udpStopAndWait(int soc)
 int main(int argc, char* argv[]) {
     // check the arguments
     if (argc != 3) {
-        printf("Usage: ./tcp_client <receiver ip-address> <receiver port>\n");
+        printf("Usage: ./%s <receiver ip-address> <receiver port>\n",argv[0]);
         exit(1);
     }
     

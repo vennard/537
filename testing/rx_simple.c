@@ -16,8 +16,6 @@
 #include <limits.h>
 
 #define MESLEN 128 // length of inbound/outbound messages
-#define ACKLEN 20 // length of ACKs
-#define TIMEOUT 2
 
 int udpInit(char* localPort) {
   // create a socket
@@ -56,30 +54,9 @@ int udpInit(char* localPort) {
 }
 
 
-int getSeq(char* buf, int rxRes, int bufLen)
-{
-  // major recv error -> return -1
-  // invalid packet -> return 0
-  // otherwise return the received SEQ number
-  
-  if (rxRes < 0) return -1;
-  if (rxRes != bufLen) return 0;
-  if (strncmp(buf,"SEQ=",4) != 0) return 0;
-  
-  unsigned int ack = strtoul(buf+4, NULL, 10);
-  if (ack==0 || ack==ULONG_MAX) return 0;
-  
-  return ack;  
-}
-
-
 void udpStopAndWait(int soc)
 {
-  char bufOut[ACKLEN];
   char bufIn[MESLEN];  
-  
-  unsigned int seqNum;
-  unsigned int ackNum = 1;
   int txRes, rxRes;
   
   // prepare a structure for the remote host info
@@ -90,44 +67,16 @@ void udpStopAndWait(int soc)
   {                
     // receive a packet
     rxRes = recvfrom(soc, bufIn, sizeof(bufIn), 0, (struct sockaddr*) &sender, &senderSize);   
-    seqNum = getSeq(bufIn, rxRes, sizeof(bufIn));
-    if (seqNum == -1)
-    {
-      perror("Warning: Unknown receive error, trying again\n");
-      sleep(TIMEOUT); // wait for a while
-      continue;
-    }    
-    else if (seqNum == 0)
-    {
-      perror("Warning: Received an invalid packet, ignoring it\n");
-      continue; // do not send an ACK
-    } else {
-      printf("SEQ=%u received\n",seqNum);    
-      if (ackNum == seqNum)
-      {
-        ackNum++;
-      }
-    } 
+    printf("Received: %s\n",bufIn);    
+  } 
     
-    // send a response
-    memset(bufOut, seqNum, sizeof(bufOut)); // put "data" in the output buffer
-    sprintf(bufOut, "ACK=%u#", ackNum);
-                    
-    txRes = sendto(soc, bufOut, sizeof(bufOut),0,(struct sockaddr*) &sender, senderSize);
-    if (txRes == -1)
-    {
-      perror("Warning: Failed to send a packet\n");    
-    } else {
-      printf("ACK=%u sent\n",ackNum);      
-    }                 
-  }
 }
 
 
 int main(int argc, char* argv[]) {
     // check the arguments
     if (argc != 2) {
-        printf("Usage: ./tcp_receiver <local port>\n");
+        printf("Usage: ./%s <local port>\n", argv[0]);
         exit(1);
     }
     
