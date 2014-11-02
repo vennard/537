@@ -38,7 +38,6 @@ int main(int argc, char *argv[]) {
     }
 
     int os=socket(PF_INET,SOCK_DGRAM,IPPROTO_IP);
-    int og=socket(PF_INET,SOCK_DGRAM,IPPROTO_IP);
 
 	 struct sockaddr_in a;
 	 struct sockaddr_in b;
@@ -54,17 +53,11 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in c;
     c.sin_family=AF_INET;
-    c.sin_addr.s_addr=inet_addr(argv[1]); 
+    //c.sin_addr.s_addr=inet_addr(argv[1]); 
 	 c.sin_port=htons(atoi(argv[2]));
 
     if(bind(os,(struct sockaddr *)&c,sizeof(c)) == -1) {
         printf("Can't bind our address (%s:%s)\n", argv[1], argv[2]);
-        exit(1); 
-	 }
-
-	 //testing TODO adding rx from second node
-	 if (bind(og,(struct sockaddr *)&a,sizeof(a)) == -1) {
-        printf("Can't bind our address (%s:%s)\n", argv[5], argv[2]);
         exit(1); 
 	 }
 
@@ -79,10 +72,14 @@ int main(int argc, char *argv[]) {
     while(1) {
         char buf[65535];
 		  socklen_t sn=sizeof(sa);
-        //int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
-        int n=recvfrom(og,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
+        int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
         if(n<=0) continue;
+		  printf("Got %s\n -- rerouting",buf);
+		  if (argc > 3) {
+			  sendto(os,buf,n,0,(struct sockaddr *)&c,sizeof(c));
+		  }
 
+		  /*
 		  //If in echo mode
         if(argc==3) { sendto(os,buf,n,0,(struct sockaddr *)&sa,sn);
 		  //if got packet from target address, send back to receivers
@@ -93,6 +90,7 @@ int main(int argc, char *argv[]) {
             sendto(os,buf,n,0,(struct sockaddr *)&c,sizeof(c));
             da=sa;
         }
+		  */
     }
 }
 
