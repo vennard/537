@@ -39,15 +39,17 @@ int main(int argc, char *argv[]) {
 
     int os=socket(PF_INET,SOCK_DGRAM,IPPROTO_IP);
 
-	 struct sockaddr_in a;
-	 a.sin_family=AF_INET;
-	 a.sin_addr.s_addr=inet_addr(argv[5]);
-	 a.sin_port=htons(atoi(argv[2]));
+	 if (argc==7) {
+		struct sockaddr_in a;
+		a.sin_family=AF_INET;
+		a.sin_addr.s_addr=inet_addr(argv[5]);
+		a.sin_port=htons(atoi(argv[2]));
 
-	 struct sockaddr_in b;
-	 b.sin_family=AF_INET;
-	 b.sin_addr.s_addr=inet_addr(argv[6]);
-	 b.sin_port=htons(atoi(argv[2]));
+	 	struct sockaddr_in b;
+	 	b.sin_family=AF_INET;
+	 	b.sin_addr.s_addr=inet_addr(argv[6]);
+	 	b.sin_port=htons(atoi(argv[2]));
+	 }
 
     struct sockaddr_in c;
     c.sin_family=AF_INET;
