@@ -38,14 +38,15 @@ int main(int argc, char *argv[]) {
     }
 
     int os=socket(PF_INET,SOCK_DGRAM,IPPROTO_IP);
+    int og=socket(PF_INET,SOCK_DGRAM,IPPROTO_IP);
 
+	 struct sockaddr_in a;
+	 struct sockaddr_in b;
 	 if (argc==7) {
-		struct sockaddr_in a;
 		a.sin_family=AF_INET;
 		a.sin_addr.s_addr=inet_addr(argv[5]);
 		a.sin_port=htons(atoi(argv[2]));
 
-	 	struct sockaddr_in b;
 	 	b.sin_family=AF_INET;
 	 	b.sin_addr.s_addr=inet_addr(argv[6]);
 	 	b.sin_port=htons(atoi(argv[2]));
@@ -55,11 +56,22 @@ int main(int argc, char *argv[]) {
     c.sin_family=AF_INET;
     c.sin_addr.s_addr=inet_addr(argv[1]); 
 	 c.sin_port=htons(atoi(argv[2]));
+
     if(bind(os,(struct sockaddr *)&c,sizeof(c)) == -1) {
         printf("Can't bind our address (%s:%s)\n", argv[1], argv[2]);
-        exit(1); }
+        exit(1); 
+	 }
 
-    if(argc==5) { c.sin_addr.s_addr=inet_addr(argv[3]); c.sin_port=htons(atoi(argv[4])); }
+	 //testing TODO adding rx from second node
+	 if (bind(og,(struct sockaddr *)&a,sizeof(a)) == -1) {
+        printf("Can't bind our address (%s:%s)\n", argv[5], argv[2]);
+        exit(1); 
+	 }
+
+    if(argc==5) { 
+	 	  c.sin_addr.s_addr=inet_addr(argv[3]); 
+		  c.sin_port=htons(atoi(argv[4])); 
+	 }
 
     struct sockaddr_in sa;
     struct sockaddr_in da; 
@@ -67,7 +79,8 @@ int main(int argc, char *argv[]) {
     while(1) {
         char buf[65535];
 		  socklen_t sn=sizeof(sa);
-        int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
+        //int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
+        int n=recvfrom(og,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
         if(n<=0) continue;
 
 		  //If in echo mode
