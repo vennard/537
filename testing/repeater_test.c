@@ -53,38 +53,37 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in c;
     c.sin_family=AF_INET;
-    //c.sin_addr.s_addr=inet_addr(argv[1]); 
-	 c.sin_port=htons(atoi(argv[2]));
+ //   c.sin_addr.s_addr=inet_addr(argv[1]); 
+    c.sin_port=htons(atoi(argv[2]));
 
     if(bind(os,(struct sockaddr *)&c,sizeof(c)) == -1) {
         printf("Can't bind our address (%s:%s)\n", argv[1], argv[2]);
         exit(1); 
 	 }
 
-    if(argc==5) { 
+    if(argc==5 || argc==7) { 
 	 	  c.sin_addr.s_addr=inet_addr(argv[3]); 
 		  c.sin_port=htons(atoi(argv[4])); 
 	 }
-
     struct sockaddr_in sa;
     struct sockaddr_in da; 
 	 da.sin_addr.s_addr=0;
+	printf("TARGET ID: %i\n",(int)c.sin_addr.s_addr);
     while(1) {
         char buf[65535];
 		  socklen_t sn=sizeof(sa);
         int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
         if(n<=0) continue;
-		  printf("Got %s -- rerouting\n",buf);
+		  printf("Got %s from %i -- rerouting\n",buf,(int)sa.sin_addr.s_addr);
 
 		  //packet recieved from target - send back to both recievers
-        if(sa.sin_addr.s_addr==c.sin_addr.s_addr && sa.sin_port==c.sin_port) {
+ //       	if(sa.sin_addr.s_addr==c.sin_addr.s_addr && sa.sin_port==c.sin_port) {
+if (sa.sin_addr.s_addr==c.sin_addr.s_addr) {
 			  printf("Sent back packet back from target\n");
 		  	  sendto(os,buf,n,0,(struct sockaddr *)&a,sizeof(a)); 
 		  	  sendto(os,buf,n,0,(struct sockaddr *)&b,sizeof(b)); 
 		  }
-		  else if (argc > 3) {
-			  sendto(os,buf,n,0,(struct sockaddr *)&c,sizeof(c));
-		  }
+		else if (argc > 3) {	  sendto(os,buf,n,0,(struct sockaddr *)&c,sizeof(c)); }
 
 		  /*
 		  //If in echo mode
