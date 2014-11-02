@@ -74,8 +74,15 @@ int main(int argc, char *argv[]) {
 		  socklen_t sn=sizeof(sa);
         int n=recvfrom(os,buf,sizeof(buf),0,(struct sockaddr *)&sa,&sn);
         if(n<=0) continue;
-		  printf("Got %s\n -- rerouting",buf);
-		  if (argc > 3) {
+		  printf("Got %s -- rerouting\n",buf);
+
+		  //packet recieved from target - send back to both recievers
+        if(sa.sin_addr.s_addr==c.sin_addr.s_addr && sa.sin_port==c.sin_port) {
+			  printf("Sent back packet back from target\n");
+		  	  sendto(os,buf,n,0,(struct sockaddr *)&a,sizeof(a)); 
+		  	  sendto(os,buf,n,0,(struct sockaddr *)&b,sizeof(b)); 
+		  }
+		  else if (argc > 3) {
 			  sendto(os,buf,n,0,(struct sockaddr *)&c,sizeof(c));
 		  }
 
