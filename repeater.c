@@ -22,7 +22,7 @@
 #define DEBUG 1
 
 int main(int argc, char *argv[]) {
-	if (argc!=6) {
+	if (argc!=5) {
 		printf("Usage: %s this-port a-ip b-ip c-ip\n",argv[0]);
 		printf("Note - uses same port for all connected nodes, see below for configuration\n");
 		printf("     <node a>      <node b>\n");
