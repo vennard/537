@@ -13,11 +13,7 @@
  * JLV - 10/30/14
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "common.h"
 
 #define DEBUG 1
 
