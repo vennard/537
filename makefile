@@ -1,19 +1,20 @@
 # JLV - 10/17/14
 # Early version - use only as framework example
 
-CFLAGS= -Wall -Wextra -Werror
+CC= gcc
+CFLAGS= -std=c99 -m32 -Wall -Wextra -Werror
 
 all: server client repeater
 
 server: server.c
-	$(CC) $(CFLAGS) server.c -o server
+	$(CC) $(CFLAGS) server.c common.c common.h -o server
 
 client: client.c
-	$(CC) $(CFLAGS) client.c -o client 
+	$(CC) $(CFLAGS) client.c common.c common.h -o client 
 
 repeater: repeater.c
-	$(CC) $(CFLAGS) repeater.c -o repeater
+	$(CC) $(CFLAGS) repeater.c common.c common.h -o repeater
 
 clean:
-	-rm server client repeater
+	rm -f server client repeater
 
