@@ -1,11 +1,13 @@
 /* Server code
+ * After receiving a request from client, sends an acknowledgment and starts
+ * sending data packets. When the transfer is completed, sends a FIN packet.
  * 
  * Jan Beran
  */
 
 #define _BSD_SOURCE // for usleap
 #include "common.h"
-#define MOVIE_PACKETS 1000
+#define MOVIE_PACKETS 100
 
 // buffers for in/out packets
 static unsigned char pktIn[PKTLEN_REQ] = {0};
@@ -42,7 +44,7 @@ bool receiveReq(int soc, struct sockaddr_in* client) {
                 errCount = 0;
                 break;
             default:
-                printf("Warning: Received an unknown packet, ignoring it\n");
+                printf("Warning: Received an unexpected packet type, ignoring it\n");
                 errCount++;
                 continue;
         }
@@ -56,7 +58,7 @@ bool receiveReq(int soc, struct sockaddr_in* client) {
         return true;
     }
 
-    printf("Error: Maximum number of errors reached\n");
+    printf("Error: Received maximum number of subsequent bad packets\n");
     return false;
 }
 
@@ -68,13 +70,17 @@ bool streamFile(int soc, struct sockaddr_in* client) {
     hdrOut->type = TYPE_DATA;
     hdrOut->seq = 1;
 
+    unsigned int delay = 300000; // just to have a nice graph
     for (int i = 0; i < MOVIE_PACKETS; i++) {
         int res = sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));        
-        usleep(10000);
-        if (res == -1) printf("err: %s\n", strerror(errno));
+        if (res == -1) {
+            printf("Warning: tx error occurred for SEQ=%u\n", hdrOut->seq);
+        }
         printf("Sent data packet, SEQ=%u\n", hdrOut->seq);
         hdrOut->seq++;
+        usleep(delay);               
 
+        //if (i % 200 == 0) delay /= 2; // just to have a nice graph
     }
 
     hdrOut->type = TYPE_FIN;
@@ -94,6 +100,8 @@ int main(int argc, char *argv[]) {
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, server stopped\n");
         exit(1);
+    } else {
+        printf("UDP socket initialized, SOCID=%d\n", soc);
     }
 
     struct sockaddr_in client;
@@ -103,12 +111,16 @@ int main(int argc, char *argv[]) {
         printf("Error: Request cannot be received, server stopped\n");
         close(soc);
         exit(1);
+    } else {
+        printf("A request from %s received, streaming the requested file\n",inet_ntoa(client.sin_addr));
     }
 
     if (streamFile(soc, &client) == false) {
-        printf("Error: Error during the file streaming, program stopped\n");
+        printf("Error: Error during the file streaming, server stopped\n");
         close(soc);
         exit(1);
+    } else {
+        printf("File successfully broadcasted\n");
     }
 
     close(soc);

@@ -1,14 +1,47 @@
 /* Client code 
+ * Sends a request to stream a file (movie) from server, waits for acknowledgment and
+ * keeps receiving data packets until a FIN packet is received.
  * 
  * Jan Beran
  */
 
 #include "common.h"
-#define CLIENT_LOG_NAME "client_log"
+#define GRAPH_DATA_FILE "graph_datafile"
+#define GNUPLOT_SCRIPT "graph_plot.sh"
+#define GRAPH_OUTPUT_FILE "graph.png"
 
 // buffers for in/out packets
 static unsigned char pktIn[PKTLEN_DATA] = {0};
 static unsigned char pktOut[PKTLEN_REQ] = {0};
+
+bool plotGraph(void) {
+    char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + strlen(GRAPH_OUTPUT_FILE) + 10];
+
+    // set gnuplot script permissions
+    snprintf(cmd, sizeof (cmd), "chmod +x %s", GNUPLOT_SCRIPT);
+    if (system(cmd) != 0) {
+        return false;
+    }
+
+    // execute the script
+    snprintf(cmd, sizeof (cmd), "./%s %s %s", GNUPLOT_SCRIPT, GRAPH_DATA_FILE, GRAPH_OUTPUT_FILE);
+    if (system(cmd) != 0) {
+        return false;
+    }
+
+    return true;
+}
+
+bool printRx(FILE* graphFile, struct timeval* tvStart, struct timeval* tvRecv, unsigned int seq) {
+    unsigned int diff = timeDiff(tvStart, tvRecv);
+    if (diff == UINT_MAX) return false;
+
+    printf("Received data packet, TIME=%u, SEQ=%u\n", diff, seq);
+    if (fprintf(graphFile, "%u %u\n", diff, seq) < 0) {
+        return false;
+    }
+    return true;
+}
 
 bool reqFile(int soc, char* serverIpStr) {
     // create structures for the server info
@@ -53,13 +86,13 @@ bool reqFile(int soc, char* serverIpStr) {
 
         switch (hdrIn->type) {
             case TYPE_REQACK:
-                printf("REQACK received\n");
+                printf("Request acknowledgment received\n");
                 return true;
             case TYPE_REQNAK:
                 printf("Error: The requested file cannot be streamed\n");
                 return false;
             default:
-                printf("Warning: Received an unknown packet, ignoring it\n");
+                printf("Warning: Received an unexpected packet type, ignoring it\n");
                 continue;
         }
     }
@@ -67,18 +100,20 @@ bool reqFile(int soc, char* serverIpStr) {
     return false;
 }
 
-bool receiveMovie(int soc, FILE* logFile) {
+bool receiveMovie(int soc, FILE * graphFile) {
     struct sockaddr_in sender;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
+    struct timeval tvStart, tvRecv;
 
     // Packet headers
     pkthdr_common* hdrIn = (pkthdr_common*) & pktIn;
 
+    gettimeofday(&tvStart, NULL);
     while (errCount < MAX_TX_ATTEMPTS) {
         memset(pktIn, 0, PKTLEN_DATA);
         int rxRes = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
-        time_t rxTime = time(NULL); // get a timestamp
+        gettimeofday(&tvRecv, NULL); // get a timestamp
         rxRes = checkRxStatus(rxRes, hdrIn, PKTLEN_DATA, ID_CLIENT);
 
         switch (rxRes) {
@@ -105,60 +140,74 @@ bool receiveMovie(int soc, FILE* logFile) {
                 errCount = 0;
                 break;
             case TYPE_FIN:
-                printf("Streaming successfully finished\n");
+                printf("FIN packet received\n");
                 return true;
             default:
-                printf("Warning: Received an unknown packet, ignoring it\n");
+                printf("Warning: Received an unexpected packet type, ignoring it\n");
                 errCount++;
                 continue;
         }
 
         // process the received data packet
-        char* mes = "Received data, TIME=%s, SEQ=%u\n";
-        fprintf(logFile, mes, ctime(&rxTime), hdrIn->seq);
-        printf(mes, ctime(&rxTime), hdrIn->seq);
+        if (printRx(graphFile, &tvStart, &tvRecv, hdrIn->seq) == UINT_MAX) {
+            printf("Warning: Graph data file write error\n");
+        }
     }
-    
-    printf("Error: Maximum number of errors reached\n");
+
+    printf("Error: Received maximum number of subsequent bad packets\n");
     return false;
 }
 
 int main(int argc, char *argv[]) {
     // check the arguments
     if (argc != 3) {
-        printf("Usage: %s <filename>\n", argv[0]);
+        printf("Usage: %s <server ip> <requested file>\n", argv[0]);
         exit(1);
     }
 
     //int soc = udpInit(UDP_PORT, CLIENT_TIMEOUT);
-    int soc = udpInit(UDP_PORT+1, CLIENT_TIMEOUT);
+    int soc = udpInit(UDP_PORT + 1, CLIENT_TIMEOUT);
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
+    } else {
+        printf("UDP socket initialized, IP=%s, SOCID=%d\n", argv[1], soc);
     }
 
-    printf("Requesting file <filename will be here> from the server\n");
+    printf("Requesting file '%s' from the server\n", argv[2]);
     if (reqFile(soc, argv[1]) == false) {
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);
+    } else {
+        printf("Request for '%s' successful, waiting for data\n", argv[2]);
     }
 
-    FILE* logFile = fopen(CLIENT_LOG_NAME, "w");
-    if (logFile == NULL) {
-        printf("Error: Logfile could not be opened, program stopped\n");
+    FILE* graphFile = fopen(GRAPH_DATA_FILE, "w");
+    if (graphFile == NULL) {
+        printf("Error: Graph data file could not be opened, program stopped\n");
         exit(1);
     }
 
-    printf("File request successful\n");
-    if (receiveMovie(soc, logFile) == false) {
+    if (receiveMovie(soc, graphFile) == false) {
         printf("Error: Error during the file streaming, program stopped\n");
-        fclose(logFile);
+        fclose(graphFile);
         close(soc);
         exit(1);
+    } else {
+        printf("File '%s' successfully transfered\n", argv[2]);
     }
 
-    fclose(logFile);
+    // "delete" resources
+    fclose(graphFile);
     close(soc);
+
+    // plot a graph
+    if (plotGraph() == false) {
+        printf("Warning: Graph could not be plotted\n");
+    } else {
+        printf("RX packet rate graph: '%s', raw data: '%s'\n", GRAPH_OUTPUT_FILE, GRAPH_DATA_FILE);
+    }
+
     return 0;
 }
