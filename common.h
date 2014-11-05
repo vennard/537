@@ -19,6 +19,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <errno.h>
+#include <limits.h>
 #include <inttypes.h> // fixed length datatypes (e.g. u_int32_t)
 #include <stdbool.h> // define bool datatype
 
@@ -131,6 +132,18 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec);
  * Return value: one of the rx result codes (see above)
  */
 int checkRxStatus(int rxRes, pkthdr_common* hdr, int expSize, uint8_t expDst);
+
+/*
+ * timeDiff
+ * 
+ * Compute time difference between two timeval values.
+ * 
+ * beg: pointer to a timeval value, beggining of the measured time interval
+ * end: pointer to a timeval value, end of the measured time interval
+ * 
+ * Return value: elapsed time in msecs, UINT_MAX if error occured (e.g. end < beg)
+ */
+unsigned int timeDiff(struct timeval* beg, struct timeval* end);
 
 #endif	/* COMMON_H */
 

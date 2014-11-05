@@ -62,9 +62,7 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
         if (setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, &time, sizeof (time)) != 0) {
             printf("Warning: Socket timeout could not be set\n");
         }
-    }
-
-    printf("UDP socket initialized, SOC=%d\n", soc);
+    }    
     return soc;
 }
 
@@ -84,12 +82,34 @@ int checkRxStatus(int rxRes, pkthdr_common* hdr, int expSize, uint8_t expDst) {
         }
     }
 
-    if (rxRes != expSize) {        
+    if (rxRes != expSize) {
+        // unexpected packet size
         return RX_CORRUPTED_PKT;
     }
 
     if (hdr->dst != expDst) {
+        // packet is not for us
         return RX_UNKNOWN_PKT;
-    }    
+    }
     return RX_OK;
+}
+
+unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
+    // check the pointers
+    if (beg == NULL || end == NULL) return UINT_MAX;
+
+    // check if beg <= end
+    if (beg->tv_sec > end->tv_sec) return UINT_MAX;
+    if ((beg->tv_sec == end->tv_sec) && (beg->tv_usec > end->tv_usec)) return UINT_MAX;
+
+    // compute the difference
+    unsigned int secDiff = (unsigned int) ((end->tv_sec - beg->tv_sec) * 1000);
+    unsigned int usecDiff;
+    if (end->tv_usec < beg->tv_usec) {
+        usecDiff = (unsigned int) ((beg->tv_usec - end->tv_usec) / 1000);
+        return (secDiff - usecDiff);
+    } else {
+        usecDiff = (unsigned int) ((end->tv_usec - beg->tv_usec) / 1000);
+        return (secDiff + usecDiff);
+    }
 }
