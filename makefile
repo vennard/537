@@ -2,7 +2,7 @@
 # Early version - use only as framework example
 
 CC= gcc
-CFLAGS= -std=c99 -m32 -Wall -Wextra -Werror
+CFLAGS= -std=c99 -Wall -Wextra -Werror
 
 all: server client repeater
 
@@ -16,5 +16,5 @@ repeater: repeater.c
 	$(CC) $(CFLAGS) repeater.c common.c common.h -o repeater
 
 clean:
-	rm -f server client repeater
+	rm -f server client repeater graph.png graph_datafile
 
