@@ -62,12 +62,12 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
         if (setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, &time, sizeof (time)) != 0) {
             printf("Warning: Socket timeout could not be set\n");
         }
-    }    
+    }
     return soc;
 }
 
-int checkRxStatus(int rxRes, pkthdr_common* hdr, int expSize, uint8_t expDst) {
-    if ((hdr == NULL) || (expSize < 1) || (expDst < 1)) {
+int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
+    if ((pkt == NULL) || (expDst < 1)) {
         // wrong parameters, treat as err                   
         return RX_ERR;
     }
@@ -82,11 +82,12 @@ int checkRxStatus(int rxRes, pkthdr_common* hdr, int expSize, uint8_t expDst) {
         }
     }
 
-    if (rxRes != expSize) {
+    if ((rxRes != PKTLEN_DATA) && (rxRes != PKTLEN_MSG)) {
         // unexpected packet size
         return RX_CORRUPTED_PKT;
     }
 
+    pkthdr_common* hdr = (pkthdr_common*) pkt;
     if (hdr->dst != expDst) {
         // packet is not for us
         return RX_UNKNOWN_PKT;
@@ -112,4 +113,38 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
         usecDiff = (unsigned int) ((end->tv_usec - beg->tv_usec) / 1000);
         return (secDiff + usecDiff);
     }
+}
+
+bool fillPktHdr(
+        unsigned char* buf,
+        uint8_t src, uint8_t dst, uint8_t type, uint32_t seq,
+        unsigned char* payload, unsigned int payloadLen) {
+
+    if (buf == NULL) {
+        return false;
+    }
+
+    unsigned int pktLen;
+    if (type == TYPE_DATA) {
+        pktLen = PKTLEN_DATA;
+    } else {
+        pktLen = PKTLEN_MSG;
+    }
+
+    memset(buf, 0, pktLen);
+
+    pkthdr_common* hdr = (pkthdr_common*) buf;
+    hdr->src = src;
+    hdr->dst = dst;
+    hdr->type = type;
+    hdr->seq = seq;
+
+    if ((payload != NULL) && (payloadLen > 0)) {
+        if ((payloadLen + HDRLEN) > pktLen) {
+            return false;
+        }
+        memcpy((buf + HDRLEN), payload, payloadLen);
+    }
+
+    return true;
 }

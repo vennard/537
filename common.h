@@ -33,14 +33,15 @@
 /*******************
  * General defines
  *******************/
+#define dprintf(...) do { if (DEBUG) printf(__VA_ARGS__); } while (0) // debug print (use make debug)
 #define UDP_PORT 55555 // does not matter for now
-#define CLIENT_TIMEOUT 2 // timeout for recv call (secs)
+#define RECV_TIMEOUT 2 // timeout for recv call (secs)
+#define MAX_FILENAME_LEN 50 // maximum lenght of filenames
 
 
 /*******************
- * Packet defines
+ * Packet Headers
  *******************/
-
 /* Common packet header
  * Beginning of the received packet should be casted to this struct to easily read the header */
 typedef struct pkthdr_common {
@@ -51,6 +52,17 @@ typedef struct pkthdr_common {
     /* followed by payload */
 } pkthdr_common;
 
+/*Packet header of TYPE_REQ packet*/
+typedef struct pkthdr_req {
+    pkthdr_common common_hdr;
+    /* payload starts here */
+    int8_t filename[MAX_FILENAME_LEN]; // name of the requested file    
+} pkthdr_req;
+
+
+/*******************
+ * Packet Defines
+ *******************/
 /* Packet type codes */
 #define TYPE_REQ 1      // request for a new file to stream
 #define TYPE_REQACK 2   // request confirmation, followed by data packets
@@ -67,12 +79,10 @@ typedef struct pkthdr_common {
 /* Change: Client has to communicate with all the servers, ID_SERVER define does not make sense */
 
 /* Packet lengths (without headers) */
-#define PKTLEN_REQ 128 // fixed size for easy usage, can be changed in the future
+#define PKTLEN_MSG 128 // fixed size for easy usage, can be changed in the future
 #define PKTLEN_DATA 1024
+#define HDRLEN (sizeof(pkthdr_common)) // header size
 
-/* Packet offsets (bytes)*/
-#define OFF_HEADER 0
-#define OFF_PAYLOAD (sizeof(pkthdr_common))
 
 
 /*******************
@@ -87,6 +97,14 @@ typedef struct pkthdr_common {
 #define RX_UNKNOWN_PKT 5    // received unknown packet, ignore it
 
 #define MAX_TX_ATTEMPTS 5   // maximum number of repeated packet tx
+
+
+/*******************
+ * Graph plotting defines
+ *******************/
+#define GRAPH_DATA_FILE "graph_datafile"
+#define GNUPLOT_SCRIPT "graph_plot.sh"
+#define GRAPH_OUTPUT_FILE "graph.png"
 
 
 /*******************
@@ -125,13 +143,13 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec);
  * Check the return value of recv call and the received packet and return an rx status
  * 
  * rxRes: return value of recv call
- * hdr: pointer to the packet header
+ * pkt: pointer to the packet
  * expSize: expected size of received packet (bytes)
  * expDst: expected packet destination
  * 
  * Return value: one of the rx result codes (see above)
  */
-int checkRxStatus(int rxRes, pkthdr_common* hdr, int expSize, uint8_t expDst);
+int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst);
 
 /*
  * timeDiff
@@ -144,6 +162,12 @@ int checkRxStatus(int rxRes, pkthdr_common* hdr, int expSize, uint8_t expDst);
  * Return value: elapsed time in msecs, UINT_MAX if error occured (e.g. end < beg)
  */
 unsigned int timeDiff(struct timeval* beg, struct timeval* end);
+
+
+bool fillPktHdr(
+        unsigned char* buf, 
+        uint8_t src, uint8_t dst, uint8_t type, uint32_t seq, 
+        unsigned char* payload, unsigned int payloadLen );
 
 #endif	/* COMMON_H */
 
