@@ -6,13 +6,10 @@
  */
 
 #include "common.h"
-#define GRAPH_DATA_FILE "graph_datafile"
-#define GNUPLOT_SCRIPT "graph_plot.sh"
-#define GRAPH_OUTPUT_FILE "graph.png"
 
 // buffers for in/out packets
 static unsigned char pktIn[PKTLEN_DATA] = {0};
-static unsigned char pktOut[PKTLEN_REQ] = {0};
+static unsigned char pktOut[PKTLEN_MSG] = {0};
 
 bool plotGraph(void) {
     char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + strlen(GRAPH_OUTPUT_FILE) + 10];
@@ -36,7 +33,7 @@ bool printRx(FILE* graphFile, struct timeval* tvStart, struct timeval* tvRecv, u
     unsigned int diff = timeDiff(tvStart, tvRecv);
     if (diff == UINT_MAX) return false;
 
-    printf("Received data packet, TIME=%u, SEQ=%u\n", diff, seq);
+    dprintf("Received data packet, TIME=%u, SEQ=%u\n", diff, seq);
     if (fprintf(graphFile, "%u %u\n", diff, seq) < 0) {
         return false;
     }
@@ -48,26 +45,21 @@ bool reqFile(int soc, char* serverIpStr) {
     struct sockaddr_in server, sender;
     unsigned int senderSize = sizeof (sender);
     if (initHostStruct(&server, serverIpStr, UDP_PORT) == false) {
-        close(soc);
         return false;
     }
 
-    // Packet headers
-    pkthdr_common* hdrIn = (pkthdr_common*) & pktIn;
-    pkthdr_common* hdrOut = (pkthdr_common*) & pktOut;
-
     // create the request
-    hdrOut->src = ID_CLIENT;
-    hdrOut->dst = ID_SERVER;
-    hdrOut->type = TYPE_REQ;
-    hdrOut->seq = 0;
+    if (fillPktHdr(pktOut, ID_CLIENT, ID_SERVER, TYPE_REQ, 0, NULL, 0) == false) {
+        dprintf("Error: Outbound request packet could not be created\n");
+        return false;
+    }
 
     // send the request and receive a reply
     for (int i = 0; i < MAX_TX_ATTEMPTS; i++) {
-        sendto(soc, pktOut, PKTLEN_REQ, 0, (struct sockaddr*) &server, sizeof (server));
+        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
         memset(pktIn, 0, PKTLEN_DATA);
-        int rxRes = recvfrom(soc, pktIn, PKTLEN_REQ, 0, (struct sockaddr*) &sender, &senderSize);
-        rxRes = checkRxStatus(rxRes, hdrIn, PKTLEN_REQ, ID_CLIENT);
+        int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
+        rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
 
         switch (rxRes) {
             case RX_OK:
@@ -84,9 +76,9 @@ bool reqFile(int soc, char* serverIpStr) {
                 continue;
         }
 
-        switch (hdrIn->type) {
+        switch (((pkthdr_common*) pktIn)->type) {
             case TYPE_REQACK:
-                printf("Request acknowledgment received\n");
+                dprintf("Request acknowledgment received\n");
                 return true;
             case TYPE_REQNAK:
                 printf("Error: The requested file cannot be streamed\n");
@@ -106,15 +98,12 @@ bool receiveMovie(int soc, FILE * graphFile) {
     unsigned int errCount = 0;
     struct timeval tvStart, tvRecv;
 
-    // Packet headers
-    pkthdr_common* hdrIn = (pkthdr_common*) & pktIn;
-
     gettimeofday(&tvStart, NULL);
     while (errCount < MAX_TX_ATTEMPTS) {
         memset(pktIn, 0, PKTLEN_DATA);
         int rxRes = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
         gettimeofday(&tvRecv, NULL); // get a timestamp
-        rxRes = checkRxStatus(rxRes, hdrIn, PKTLEN_DATA, ID_CLIENT);
+        rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
 
         switch (rxRes) {
             case RX_OK:
@@ -134,13 +123,13 @@ bool receiveMovie(int soc, FILE * graphFile) {
                 continue;
         }
 
-        switch (hdrIn->type) {
+        switch (((pkthdr_common*) pktIn)->type) {
             case TYPE_DATA:
                 // expected packet
                 errCount = 0;
                 break;
             case TYPE_FIN:
-                printf("FIN packet received\n");
+                dprintf("FIN packet received\n");
                 return true;
             default:
                 printf("Warning: Received an unexpected packet type, ignoring it\n");
@@ -149,7 +138,7 @@ bool receiveMovie(int soc, FILE * graphFile) {
         }
 
         // process the received data packet
-        if (printRx(graphFile, &tvStart, &tvRecv, hdrIn->seq) == UINT_MAX) {
+        if (printRx(graphFile, &tvStart, &tvRecv, ((pkthdr_common*) pktIn)->seq) == UINT_MAX) {
             printf("Warning: Graph data file write error\n");
         }
     }
@@ -165,13 +154,13 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    //int soc = udpInit(UDP_PORT, CLIENT_TIMEOUT);
-    int soc = udpInit(UDP_PORT + 1, CLIENT_TIMEOUT);
+    //int soc = udpInit(UDP_PORT, RECV_TIMEOUT);
+    int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
     } else {
-        printf("UDP socket initialized, IP=%s, SOCID=%d\n", argv[1], soc);
+        dprintf("UDP socket initialized, IP=%s, SOCID=%d\n", argv[1], soc);
     }
 
     printf("Requesting file '%s' from the server\n", argv[2]);
@@ -180,7 +169,7 @@ int main(int argc, char *argv[]) {
         close(soc);
         exit(1);
     } else {
-        printf("Request for '%s' successful, waiting for data\n", argv[2]);
+        printf("Request for '%s' successful, receiving the data\n", argv[2]);
     }
 
     FILE* graphFile = fopen(GRAPH_DATA_FILE, "w");
@@ -199,14 +188,14 @@ int main(int argc, char *argv[]) {
     }
 
     // "delete" resources
-    fclose(graphFile);
-    close(soc);
+     close(soc);
+    fclose(graphFile);   
 
     // plot a graph
     if (plotGraph() == false) {
         printf("Warning: Graph could not be plotted\n");
     } else {
-        printf("RX packet rate graph: '%s', raw data: '%s'\n", GRAPH_OUTPUT_FILE, GRAPH_DATA_FILE);
+        dprintf("RX packet rate graph: '%s', raw data: '%s'\n", GRAPH_OUTPUT_FILE, GRAPH_DATA_FILE);
     }
 
     return 0;
