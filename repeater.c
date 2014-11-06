@@ -15,8 +15,6 @@
 
 #include "common.h"
 
-#define DEBUG 1
-
 int main(int argc, char *argv[]) {
 	if (argc!=5) {
 		printf("Usage: %s this-port a-ip b-ip c-ip\n",argv[0]);
@@ -57,7 +55,7 @@ int main(int argc, char *argv[]) {
 
 	c.sin_addr.s_addr=inet_addr(argv[4]); 
 	c.sin_port=htons(atoi(argv[1])); 
-	if (DEBUG) { printf("TARGET ID: %i\n Starting repeater...\n",(int)c.sin_addr.s_addr); }
+	dprintf("TARGET ID: %i\n Starting repeater...\n",(int)c.sin_addr.s_addr);
 
 	struct sockaddr_in sa;
 	while(1) {
@@ -70,11 +68,11 @@ int main(int argc, char *argv[]) {
 
 		//send udp packet
 		if (sa.sin_addr.s_addr==c.sin_addr.s_addr) {
-			if (DEBUG) { printf("REVERSE: %s from %i\n",buf,(int)sa.sin_addr.s_addr); }
+			dprintf("REVERSE: %s from %i\n",buf,(int)sa.sin_addr.s_addr);
 			sendto(os,buf,n,0,(struct sockaddr *)&a,sizeof(a)); 
 			sendto(os,buf,n,0,(struct sockaddr *)&b,sizeof(b)); 
 		} else {  
-			if (DEBUG) { printf("FORWARD: %s from %i\n",buf,(int)sa.sin_addr.s_addr); }
+			dprintf("FORWARD: %s from %i\n",buf,(int)sa.sin_addr.s_addr);
 			sendto(os,buf,n,0,(struct sockaddr *)&c,sizeof(c)); 
 		}
 	}
