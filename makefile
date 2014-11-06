@@ -4,7 +4,11 @@
 CC= gcc
 CFLAGS= -std=c99 -Wall -Wextra -Werror
 
+all: CFLAGS += -DDEBUG=0
 all: server client repeater
+	
+debug: CFLAGS += -DDEBUG=1 -g
+debug: server client repeater
 
 server: server.c
 	$(CC) $(CFLAGS) server.c common.c common.h -o server
