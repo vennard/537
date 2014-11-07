@@ -6,7 +6,6 @@
 
 #include "common.h"
 
-// TODO: optional logging into a file
 // TODO: better debug prints
 // TODO: deal with unknown/corrupted packets
 
@@ -68,30 +67,42 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
 
 int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
     if ((pkt == NULL) || (expDst < 1)) {
-        // wrong parameters, treat as err                   
+        printf("Warning: Unknown Rx error occurred\n");
         return RX_ERR;
     }
 
     if (rxRes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // timeout on socket
+            printf("Warning: Rx timeout on socket, trying again\n");
             return RX_TIMEOUT;
         } else {
-            // major rx error
+            printf("Warning: Rx error occurred\n");
             return RX_ERR;
         }
     }
 
-    if ((rxRes != PKTLEN_DATA) && (rxRes != PKTLEN_MSG)) {
-        // unexpected packet size
+    // print the debug info
+    dprintPkt(pkt, rxRes, false);
+
+    pkthdr_common* hdr = (pkthdr_common*) pkt;
+    if (((rxRes != PKTLEN_DATA) && (rxRes != PKTLEN_MSG)) ||
+            ((rxRes == PKTLEN_MSG) && (hdr->type == TYPE_DATA)) ||
+            ((rxRes == PKTLEN_DATA) && (hdr->type != TYPE_DATA))) {
+        printf("Warning: Received a packet of invalid size, ignoring it\n");
         return RX_CORRUPTED_PKT;
     }
 
-    pkthdr_common* hdr = (pkthdr_common*) pkt;
     if (hdr->dst != expDst) {
-        // packet is not for us
+        printf("Warning: Received a packet for different node, DST=%u\n", hdr->dst);
         return RX_UNKNOWN_PKT;
     }
+
+    if (hdr->type == TYPE_FAIL) {
+        printf("Error: FAIL message received (peer failed), communication will be terminated\n");
+        return RX_TERMINATED;
+    }
+
     return RX_OK;
 }
 
@@ -115,12 +126,13 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
     }
 }
 
-bool fillPktHdr(
+bool fillpkt(
         unsigned char* buf,
         uint8_t src, uint8_t dst, uint8_t type, uint32_t seq,
         unsigned char* payload, unsigned int payloadLen) {
 
     if (buf == NULL) {
+        dprintf("Error: Packet could not be created\n");
         return false;
     }
 
@@ -141,10 +153,53 @@ bool fillPktHdr(
 
     if ((payload != NULL) && (payloadLen > 0)) {
         if ((payloadLen + HDRLEN) > pktLen) {
+            dprintf("Error: Packet could not be created\n");
             return false;
         }
         memcpy((buf + HDRLEN), payload, payloadLen);
     }
 
     return true;
+}
+
+void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
+    if (!DEBUG) {
+        return;
+    }
+
+    pkthdr_common* hdr = (pkthdr_common*) pkt;
+    char* typeStr;
+    char* dirStr;
+
+    switch (hdr->type) {
+        case TYPE_REQ:
+            typeStr = "REQ";
+            break;
+        case TYPE_REQACK:
+            typeStr = "REQACK";
+            break;
+        case TYPE_REQNAK:
+            typeStr = "REQNAK";
+            break;
+        case TYPE_DATA:
+            typeStr = "DATA";
+            break;
+        case TYPE_NAK:
+            typeStr = "NAK";
+            break;
+        case TYPE_FIN:
+            typeStr = "FIN";
+            break;
+        case TYPE_FAIL:
+            typeStr = "FAIL";
+            break;
+    }
+    if (isTx) {
+        dirStr = "Tx";
+    } else {
+        dirStr = "Rx";
+    }
+
+    dprintf("%s packet: TYPE=%s, SRC=%u, DST=%u, SEQ=%u, SIZE=%u\n",
+            dirStr, typeStr, hdr->src, hdr->dst, hdr->seq, pktLen);
 }

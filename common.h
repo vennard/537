@@ -95,6 +95,7 @@ typedef struct pkthdr_req {
 #define RX_CORRUPTED_PKT 3  // received corrupted packet
 #define RX_NOTEXPECTED 4    // received packet type not expected (not used now)
 #define RX_UNKNOWN_PKT 5    // received unknown packet, ignore it
+#define RX_TERMINATED 6     // received TYPE_FAIL, communication will be terminated
 
 #define MAX_TX_ATTEMPTS 5   // maximum number of repeated packet tx
 
@@ -163,11 +164,35 @@ int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst);
  */
 unsigned int timeDiff(struct timeval* beg, struct timeval* end);
 
-
-bool fillPktHdr(
+/*
+ * fillpkt
+ * 
+ * Create a packet, fill it with a given data
+ * 
+ * buf: pointer to the packet (i.e. allocated memory where the packet will be created)
+ * src,dst: source and destination of the packet
+ * type: type of the packet
+ * seq: SEQ number
+ * payload: pointer to payload that will be copied in the packet. NULL if there is no payload
+ * payloadLength: size (bytes) of the payload, 0 if there is no payload
+ * 
+ * Return value: true if the packet is successfully filled, false otherwise
+ */
+bool fillpkt(
         unsigned char* buf, 
         uint8_t src, uint8_t dst, uint8_t type, uint32_t seq, 
         unsigned char* payload, unsigned int payloadLen );
+
+/*
+ * dprintPkt
+ * 
+ * Print debug info about a given packet. Prints only in debug mode ("make debug" )
+ * 
+ * pkt: pointer to the packet
+ * pktLen: length of the packet (bytes)
+ * tx: true if the packet was/is transmitted, false if received
+ */
+void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx);
 
 #endif	/* COMMON_H */
 
