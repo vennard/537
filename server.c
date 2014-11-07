@@ -7,7 +7,7 @@
 
 #define _BSD_SOURCE // for usleap
 #include "common.h"
-#define TX_DELAY 100000
+#define TX_DELAY 1000
 
 // File database
 #define FILE_COUNT 2
@@ -24,8 +24,8 @@ bool lookupFile(char* file) {
     if (file == NULL) {
         return false;
     }
-
-    for (unsigned int i = 0; i < sizeof (fileDb); i++) {
+    unsigned int arrSize = sizeof (fileDb) / sizeof (fileDb[0]);
+    for (unsigned int i = 0; i < arrSize; i++) {
         if (strcmp(fileDb[i], file) == 0) {
             return true;
         }
@@ -33,7 +33,7 @@ bool lookupFile(char* file) {
     return false;
 }
 
-bool receiveReq(int soc, struct sockaddr_in* client) {
+bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     unsigned int clientSize = sizeof (*client);
     unsigned int errCount = 0;
 
@@ -42,72 +42,86 @@ bool receiveReq(int soc, struct sockaddr_in* client) {
         int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
         rxRes = checkRxStatus(rxRes, pktIn, ID_SERVER);
 
-        switch (rxRes) {
-            case RX_OK:
-                //rx OK, do nothing                
-                break;
-            case RX_UNKNOWN_PKT:
-                printf("Warning: Received an unknown packet, ignoring it\n");
-                errCount++;
-                continue;
-            default: // RX_ERR || RX_CORRUPTED_PKT               
-                printf("Warning: Rx error occurred, trying again\n");
-                errCount++;
-                continue;
+        if (rxRes == RX_TERMINATED) return false;
+        if (rxRes != RX_OK) {
+            errCount++;
+            continue;
         }
 
-        switch (((pkthdr_common*) pktIn)->type) {
-            case TYPE_REQ:
-                // expected packet
-                errCount = 0;
-                break;
-            default:
-                printf("Warning: Received an unexpected packet type, ignoring it\n");
-                errCount++;
-                continue;
+        uint8_t typeIn = ((pkthdr_common*) pktIn)->type;
+        if (typeIn != TYPE_REQ) {
+            printf("Warning: Received an unexpected packet type, ignoring it\n");
+            errCount++;
+            continue;
         }
 
-        // TODO: broadcast a real file
+        *filename = (char*) (pktIn + HDRLEN);
+        int typeOut;
+        if (lookupFile(*filename) == true) {
+            typeOut = TYPE_REQACK;
+        } else {
+            typeOut = TYPE_REQNAK;
+            printf("Error: Requested file does not exist\n");
+        }
 
-        // create an ACK
-        if (fillPktHdr(pktOut, ID_SERVER, ID_CLIENT, TYPE_REQACK, 0, NULL, 0) == false) {
-            dprintf("Error: Outbound request acknowledge packet could not be created\n");
+        if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
             return false;
         }
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
-        return true;
+        dprintPkt(pktOut, PKTLEN_MSG, true);
+
+        if (typeOut == TYPE_REQACK) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     printf("Error: Received maximum number of subsequent bad packets\n");
     return false;
 }
 
-bool streamFile(int soc, struct sockaddr_in* client) {
-    pkthdr_common* hdrOut = (pkthdr_common*) pktOut;
-    unsigned char payload[PKTLEN_DATA - HDRLEN] = {77};
+bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
+    unsigned char* payload = (pktOut + HDRLEN);
+    bool isTest;
+    if (strcmp(filename, "testpackets") == 0) {
+        isTest = true;
+        filename = "/dev/urandom";
+    } else {
+        isTest = false;
+    }
 
-    // create a data packet
-    if (fillPktHdr(pktOut, ID_SERVER, ID_CLIENT, TYPE_DATA, 1, payload, sizeof (payload)) == false) {
-        dprintf("Error: Outbound data packet could not be created\n");
+    FILE* streamFile = fopen(filename, "rb");
+    if (streamFile == NULL) {
+        printf("Error: the requested file cannot be opened, Server stopped\n");
         return false;
     }
 
-    for (int i = 0; i < EMPTY_PKT_COUNT; i++) {
+    unsigned int readSize = PKTLEN_DATA - HDRLEN;
+    unsigned int seq = 1;
+    while (readSize == PKTLEN_DATA - HDRLEN) {
+        readSize = fread(payload, 1, PKTLEN_DATA - HDRLEN, streamFile);
+        if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, TYPE_DATA, seq, payload, readSize) == false) {
+            return false;
+        }
         int res = sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
         if (res == -1) {
-            printf("Warning: tx error occurred for SEQ=%u\n", hdrOut->seq);
+            printf("Warning: tx error occurred for SEQ=%u\n", seq);
+        } else {
+            dprintPkt(pktOut, PKTLEN_DATA, true);
         }
-        dprintf("Sent data packet, SEQ=%u\n", hdrOut->seq);
-        hdrOut->seq++;
+
+        seq++;
+        if ((isTest == true) && (seq == EMPTY_PKT_COUNT)) break;
         usleep(TX_DELAY);
     }
 
-    if (fillPktHdr(pktOut, ID_SERVER, ID_CLIENT, TYPE_FIN, hdrOut->seq, NULL, 0) == false) {
-        dprintf("Error: Outbound FIN packet could not be created\n");
+    fclose(streamFile);
+    if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, TYPE_FIN, seq, NULL, 0) == false) {
         return false;
     }
     sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
-    dprintf("Sent FIN packet, SEQ=%u\n", hdrOut->seq);
+    dprintPkt(pktOut, PKTLEN_DATA, true);
     return true;
 }
 
@@ -127,17 +141,20 @@ int main(int argc, char *argv[]) {
     }
 
     struct sockaddr_in client;
+    char* filename;
 
     printf("Waiting for a request from client\n");
-    if (receiveReq(soc, &client) == false) {
-        printf("Error: Request cannot be received, server stopped\n");
+    if (receiveReq(soc, &client, &filename) == false) {
+        printf("Error: Invalid client request, server stopped\n");
         close(soc);
         exit(1);
     } else {
-        printf("A request from %s received, streaming the requested file\n", inet_ntoa(client.sin_addr));
+        printf("A request from %s received, requested file: '%s'\n",
+                inet_ntoa(client.sin_addr), filename);
+        printf("Streaming the requested file...\n");
     }
 
-    if (streamFile(soc, &client) == false) {
+    if (streamFile(soc, &client, filename) == false) {
         printf("Error: Error during the file streaming, server stopped\n");
         close(soc);
         exit(1);
