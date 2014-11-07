@@ -10,6 +10,10 @@
 // buffers for in/out packets
 static unsigned char pktIn[PKTLEN_DATA] = {0};
 static unsigned char pktOut[PKTLEN_MSG] = {0};
+static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
+//static pkthdr_common* hdrOut = (pkthdr_common*) pktOut;
+static unsigned char* payloadIn = pktIn + HDRLEN;
+//static unsigned char* payloadOut = pktOut + HDRLEN;
 
 bool plotGraph(void) {
     char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + strlen(GRAPH_OUTPUT_FILE) + 10];
@@ -29,20 +33,11 @@ bool plotGraph(void) {
     return true;
 }
 
-bool processRx(FILE* graphFile, struct timeval* tvStart, struct timeval* tvRecv, unsigned int seq) {
-    unsigned int diff = timeDiff(tvStart, tvRecv);
-    if (diff == UINT_MAX) return false;
-
-    if (fprintf(graphFile, "%u %u\n", diff, seq) < 0) {
-        return false;
-    }
-    return true;
-}
-
 bool reqFile(int soc, char* serverIpStr, char* filename) {
     // create structures for the server info
     struct sockaddr_in server, sender;
     unsigned int senderSize = sizeof (sender);
+    unsigned int errCount = 0;
     if (initHostStruct(&server, serverIpStr, UDP_PORT) == false) {
         return false;
     }
@@ -53,7 +48,7 @@ bool reqFile(int soc, char* serverIpStr, char* filename) {
     }
 
     // send the request and receive a reply
-    for (int i = 0; i < MAX_TX_ATTEMPTS; i++) {
+    while (errCount++ < MAX_ERR_COUNT) {
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
         dprintPkt(pktOut, PKTLEN_MSG, true);
         memset(pktIn, 0, PKTLEN_DATA);
@@ -63,9 +58,8 @@ bool reqFile(int soc, char* serverIpStr, char* filename) {
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) continue;
 
-        uint8_t type = ((pkthdr_common*) pktIn)->type;
-        if (type == TYPE_REQACK) return true;
-        if (type == TYPE_REQNAK) {
+        if (hdrIn->type == TYPE_REQACK) return true;
+        if (hdrIn->type == TYPE_REQNAK) {
             printf("Error: Server refused to stream the requested file\n");
             return false;
         }
@@ -76,39 +70,60 @@ bool reqFile(int soc, char* serverIpStr, char* filename) {
     return false;
 }
 
-bool receiveMovie(int soc, FILE * graphFile) {
+bool receiveMovie(int soc, char** filename) {
     struct sockaddr_in sender;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
     struct timeval tvStart, tvRecv;
 
+    if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
+    char streamedFilename[strlen(*filename) + 10];
+    snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
+    FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
+    FILE* streamedFile = fopen(streamedFilename, "wb");
+    if ((graphDataFile == NULL) || (streamedFile == NULL)) {
+        printf("Error: Local data file could not be opened, program stopped\n");
+        return false;
+    }
+
     gettimeofday(&tvStart, NULL);
-    while (errCount < MAX_TX_ATTEMPTS) {
+    while (errCount < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_DATA);
-        int rxRes = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
+        int rxLen = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
         gettimeofday(&tvRecv, NULL); // get a timestamp
 
-        rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
-        if (rxRes == RX_TERMINATED) return false;
-        if (rxRes != RX_OK) {
+        int rxRes = checkRxStatus(rxLen, pktIn, ID_CLIENT);
+        if (rxRes == RX_TERMINATED) {
+            fclose(graphDataFile);
+            fclose(streamedFile);
+            return false;
+        } else if (rxRes != RX_OK) {
             errCount++;
-            continue; // err, try again
+            continue;
         }
-        uint8_t type = ((pkthdr_common*) pktIn)->type;
-        if (type == TYPE_FIN) return true;
-        if (type != TYPE_DATA) {
+
+        if (hdrIn->type == TYPE_FIN) {
+            fclose(graphDataFile);
+            fclose(streamedFile);
+            return true;
+        } else if (hdrIn->type != TYPE_DATA) {
             printf("Warning: Received an unexpected packet type, ignoring it\n");
             errCount++;
             continue;
         }
 
-        // process the received data packet       
-        if (processRx(graphFile, &tvStart, &tvRecv, ((pkthdr_common*) pktIn)->seq) == UINT_MAX) {
+        unsigned int diff = timeDiff(&tvStart, &tvRecv);
+        if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
+        }
+        if (fwrite(payloadIn, 1, rxLen - HDRLEN, streamedFile) != (rxLen - HDRLEN)) {
+            printf("Warning: Streamed local file write error\n");
         }
     }
 
     printf("Error: Received maximum number of subsequent bad packets\n");
+    fclose(graphDataFile);
+    fclose(streamedFile);
     return false;
 }
 
@@ -122,7 +137,7 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
     } else if (argc == 2) {
-        filename = "testpackets";
+        filename = TEST_FILE;
     } else {
         printf("Usage: %s <server ip> [<requested file>]\n", argv[0]);
         exit(1);
@@ -143,27 +158,21 @@ int main(int argc, char *argv[]) {
         close(soc);
         exit(1);
     } else {
-        printf("Request for '%s' successful, receiving the data\n",filename);
+        printf("Request for '%s' successful, receiving the data\n", filename);
     }
 
-    FILE* graphFile = fopen(GRAPH_DATA_FILE, "w");
-    if (graphFile == NULL) {
-        printf("Error: Graph data file could not be opened, program stopped\n");
-        exit(1);
-    }
 
-    if (receiveMovie(soc, graphFile) == false) {
+
+    if (receiveMovie(soc, &filename) == false) {
         printf("Error: Error during the file streaming, program stopped\n");
-        fclose(graphFile);
         close(soc);
         exit(1);
     } else {
-        printf("File '%s' successfully transfered\n", filename);
+        printf("File successfully transfered, local copy: client_%s\n", filename);
     }
 
     // "delete" resources
     close(soc);
-    fclose(graphFile);
 
     // plot a graph
     if (plotGraph() == false) {
