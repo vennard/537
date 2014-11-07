@@ -37,7 +37,7 @@
 #define UDP_PORT 55555 // does not matter for now
 #define RECV_TIMEOUT 2 // timeout for recv call (secs)
 #define MAX_FILENAME_LEN 50 // maximum lenght of filenames
-
+#define TEST_FILE "/dev/urandom"
 
 /*******************
  * Packet Headers
@@ -97,7 +97,7 @@ typedef struct pkthdr_req {
 #define RX_UNKNOWN_PKT 5    // received unknown packet, ignore it
 #define RX_TERMINATED 6     // received TYPE_FAIL, communication will be terminated
 
-#define MAX_TX_ATTEMPTS 5   // maximum number of repeated packet tx
+#define MAX_ERR_COUNT 5     // maximum number of subsequent errors received
 
 
 /*******************
@@ -179,9 +179,9 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end);
  * Return value: true if the packet is successfully filled, false otherwise
  */
 bool fillpkt(
-        unsigned char* buf, 
-        uint8_t src, uint8_t dst, uint8_t type, uint32_t seq, 
-        unsigned char* payload, unsigned int payloadLen );
+        unsigned char* buf,
+        uint8_t src, uint8_t dst, uint8_t type, uint32_t seq,
+        unsigned char* payload, unsigned int payloadLen);
 
 /*
  * dprintPkt
