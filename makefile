@@ -20,5 +20,5 @@ repeater: repeater.c
 	$(CC) $(CFLAGS) repeater.c common.c common.h -o repeater
 
 clean:
-	rm -f server client repeater graph.png graph_datafile
+	rm -f server client repeater graph.png graph_datafile client_pic.bmp client_random
 
