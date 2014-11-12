@@ -2,7 +2,9 @@
  * Sends a request to stream a file (movie) from server, waits for acknowledgment and
  * keeps receiving data packets until a FIN packet is received.
  * 
- * Jan Beran
+ * Creation: Jan Beran
+ *
+ * Edited 11/12: JV - Commenting and adding splicing calculations
  */
 
 #include "common.h"
@@ -143,7 +145,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    //int soc = udpInit(UDP_PORT, RECV_TIMEOUT);
+	 // initialize UDP socket
     int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
@@ -152,6 +154,7 @@ int main(int argc, char *argv[]) {
         dprintf("UDP socket initialized, IP=%s, SOCID=%d\n", argv[1], soc);
     }
 
+	 // start transmission of file
     printf("Requesting file '%s' from the server\n", filename);
     if (reqFile(soc, argv[1], filename) == false) {
         printf("Error: Request failed, program stopped\n");
@@ -161,8 +164,7 @@ int main(int argc, char *argv[]) {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
 
-
-
+	 // receive movie
     if (receiveMovie(soc, &filename) == false) {
         printf("Error: Error during the file streaming, program stopped\n");
         close(soc);
@@ -171,10 +173,8 @@ int main(int argc, char *argv[]) {
         printf("File successfully transfered, local copy: client_%s\n", filename);
     }
 
-    // "delete" resources
+    // clean up resources and plot 
     close(soc);
-
-    // plot a graph
     if (plotGraph() == false) {
         printf("Warning: Graph could not be plotted\n");
     } else {
