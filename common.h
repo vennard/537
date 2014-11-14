@@ -31,6 +31,12 @@
 
 
 /*******************
+ * Critical Variables
+ *******************/
+#define SPLICE_UPDATE_TIME 100 //ms
+#define SPLICE_DELAY 200 //time before splice ratios change
+
+/*******************
  * General defines
  *******************/
 #define dprintf(...) do { if (DEBUG) printf(__VA_ARGS__); } while (0) // debug print (use make debug)
@@ -71,6 +77,7 @@ typedef struct pkthdr_req {
 #define TYPE_NAK 5      // negative acknowledgement, packet is missing
 #define TYPE_FIN 6      // file streaming sucessfully finished
 #define TYPE_FAIL 7     // client/server failed, stop the streaming (not used now)
+#define TYPE_SPLICE 8   // splice ratio change msg
 
 /* Source/Destination codes */
 /* Nodes 1-8: codes 1-8 */

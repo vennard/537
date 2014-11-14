@@ -65,6 +65,28 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
     return soc;
 }
 
+//TODO Change ERROR codes to be negative numbers - otherwise conflicts with node names
+int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
+ 	 if ((pkt == NULL) || (expDst < 1)) {
+        printf("Warning: Unknown Rx error occurred\n");
+        return RX_ERR;
+    }
+    if (rxRes < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            // timeout on socket
+            printf("Warning: Rx timeout on socket, trying again\n");
+            return RX_TIMEOUT;
+        } else {
+            printf("Warning: Rx error occurred\n");
+            return RX_ERR;
+        }
+    }
+    pkthdr_common* hdr = (pkthdr_common*) pkt;
+
+	 if ((hdr->src < 1) || (hdr->src > 8)) return RX_ERR;
+	 return hdr->src;
+}
+
 int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
     if ((pkt == NULL) || (expDst < 1)) {
         printf("Warning: Unknown Rx error occurred\n");
