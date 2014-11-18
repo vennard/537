@@ -82,7 +82,11 @@ typedef struct pkthdr_req {
 /* Source/Destination codes */
 /* Nodes 1-8: codes 1-8 */
 #define ID_CLIENT 8
-#define ID_SERVER 7 // the only server from client's perspective (i.e. node 7 in our setup)
+#define ID_SERVER1 10
+#define ID_SERVER2 20
+#define ID_SERVER3 30
+#define ID_SERVER4 40
+
 /* Change: Client has to communicate with all the servers, ID_SERVER define does not make sense */
 
 /* Packet lengths (without headers) */

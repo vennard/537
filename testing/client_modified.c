@@ -10,6 +10,8 @@
  */
 
 #include "common.h"
+#include "common.c"
+
 
 // buffers for in/out packets
 static unsigned char pktIn[PKTLEN_DATA] = {0};
@@ -21,6 +23,8 @@ static unsigned char* payloadIn = pktIn + HDRLEN;
 
 // data rate storage
 static int src1pkts, src2pkts, src3pkts, src4pkts = 0;
+static struct timeval tvStart, tvRecv, tvCheck;
+static char *s1, *s2, *s3, *s4; //server ip addresses
 
 // calculate and send new ratios on to server
 bool newSpliceRatio(int src1, int src2, int src3, int src4) {
@@ -31,6 +35,9 @@ bool newSpliceRatio(int src1, int src2, int src3, int src4) {
 	float src4ratio = (float) src4 / total; 
 	float checkRatio = src1ratio + src2ratio + src3ratio + src4ratio;
 	if (checkRatio != 1) return false;
+    //TODO round ratios after * SPLICE_FRAME
+    //TODO check if update is necessary (standard deviation)
+
 	//TODO finish send new ratios to servers
 	/*
 	static unsigned char pktMsg[PKTLEN_MSG] = {0};
@@ -60,24 +67,46 @@ bool plotGraph(void) {
     return true;
 }
 
-bool reqFile(int soc, char* serverIpStr, char* filename) {
-    // create structures for the server info
-    struct sockaddr_in server, sender;
+bool reqFile(int soc, char* filename) {
+    struct sockaddr_in server1, server2, server3, server4, sender;
+    unsigned char pkt1[PKTLEN_MSG], pkt2[PKTLEN_MSG], pkt3[PKTLEN_MSG], pkt4[PKTLEN_MSG]; 
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-    if (initHostStruct(&server, serverIpStr, UDP_PORT) == false) {
+    unsigned int serverAcks[4] = {0, 0, 0, 0};
+
+    //create targets
+    if (initHostStruct(&server1, s1, UDP_PORT) == false) {
+        return false;
+    }
+    if (initHostStruct(&server2, s2, UDP_PORT) == false) {
+        return false;
+    }
+    if (initHostStruct(&server3, s3, UDP_PORT) == false) {
+        return false;
+    }
+    if (initHostStruct(&server4, s4, UDP_PORT) == false) {
         return false;
     }
 
-    // create the request
-    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
+    // create the requests
+    if (fillpkt(pkt1, ID_CLIENT, ID_SERVER1, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
+        return false;
+    }
+    if (fillpkt(pkt2, ID_CLIENT, ID_SERVER2, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
+        return false;
+    }
+    if (fillpkt(pkt3, ID_CLIENT, ID_SERVER3, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
+        return false;
+    }
+    if (fillpkt(pkt4, ID_CLIENT, ID_SERVER4, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
         return false;
     }
 
     // send the request and receive a reply
     while (errCount++ < MAX_ERR_COUNT) {
-        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
-        dprintPkt(pktOut, PKTLEN_MSG, true);
+        
+
+sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server)); dprintPkt(pktOut, PKTLEN_MSG, true);
         memset(pktIn, 0, PKTLEN_DATA);
         int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
         rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
@@ -103,7 +132,6 @@ bool receiveMovie(int soc, char** filename) {
     struct sockaddr_in sender;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-    struct timeval tvStart, tvRecv, tvCheck;
     if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
     char streamedFilename[strlen(*filename) + 10];
     snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
@@ -182,24 +210,29 @@ bool receiveMovie(int soc, char** filename) {
     return false;
 }
 
-void checkArgs(argc, char *argv[]) {
+char* checkArgs(int argc, char *argv[]) {
+  char *filename;
+  if ((argc != 6) && (argc != 5)) {
+	 printf("Usage: %s <server 1 ip> <server 2 ip> <server 3 ip> <server 4 ip> [<requested file>]\n",argv[0]);
+	 exit(1);
+  } else if (argc == 6) {
+	 filename = argv[5];
+	 if (strlen(filename) > MAX_FILENAME_LEN) {
+		printf("Error: Filename too long\n");
+		exit(1);
+	 }
+  } else {
+	 filename = TEST_FILE;
+  }
+  s1 = argv[1];
+  s2 = argv[2];
+  s3 = argv[3];
+  s4 = argv[4];
+  return filename;
 }
 
 int main(int argc, char *argv[]) {
-    // check the arguments   
-    char* filename;
-    if (argc == 3) {
-        filename = argv[2];
-        if (strlen(filename) > MAX_FILENAME_LEN) {
-            printf("Error: Filename too long\n");
-            exit(1);
-        }
-    } else if (argc == 2) {
-        filename = TEST_FILE;
-    } else {
-        printf("Usage: %s <server ip> [<requested file>]\n", argv[0]);
-        exit(1);
-    }
+    char* filename = checkArgs(argc, argv);
 
 	 // initialize UDP socket
     int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
@@ -207,12 +240,15 @@ int main(int argc, char *argv[]) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
     } else {
-        dprintf("UDP socket initialized, IP=%s, SOCID=%d\n", argv[1], soc);
+        dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
 
 	 // start transmission of file
-    printf("Requesting file '%s' from the server\n", filename);
-    if (reqFile(soc, argv[1], filename) == false) {
+    printf("Requesting file '%s' from servers with the following addresses\n", filename);
+    printf("   server1: %s\n   server2: %s\n   server3: %s\n   server4: %s\n", s1, s2, s3, s4);
+
+	exit(0); //DEBUG STOP
+    if (reqFile(soc, argv[1], filename) == false) { //TODO remove middle arg
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);

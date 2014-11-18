@@ -17,6 +17,13 @@ static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
 //static unsigned char* payloadOut = pktOut + HDRLEN;
 
+static int src1pkts, src2pkts, src3pkts, src4pkts = 0;
+static struct timeval tvStart, tvRecv, tvCheck;
+static char *s1, *s2, *s3, *s4; //server ip addresses
+
+bool spliceRatio(unsigned char *pkt){
+    return true;
+}
 bool plotGraph(void) {
     char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + strlen(GRAPH_OUTPUT_FILE) + 10];
 
@@ -114,6 +121,8 @@ bool receiveMovie(int soc, char** filename) {
             continue;
         }
 
+        spliceRatio(pktIn);
+
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
@@ -128,22 +137,28 @@ bool receiveMovie(int soc, char** filename) {
     fclose(streamedFile);
     return false;
 }
-
+char* checkArgs(int argc, char *argv[]) {
+  char *filename;
+  if ((argc != 6) && (argc != 5)) {
+	 printf("Usage: %s <server 1 ip> <server 2 ip> <server 3 ip> <server 4 ip> [<requested file>]\n",argv[0]);
+	 exit(1);
+  } else if (argc == 6) {
+	 filename = argv[5];
+	 if (strlen(filename) > MAX_FILENAME_LEN) {
+		printf("Error: Filename too long\n");
+		exit(1);
+	 }
+  } else {
+	 filename = TEST_FILE;
+  }
+  s1 = argv[1];
+  s2 = argv[2];
+  s3 = argv[3];
+  s4 = argv[4];
+  return filename;
+}
 int main(int argc, char *argv[]) {
-    // check the arguments   
-    char* filename;
-    if (argc == 3) {
-        filename = argv[2];
-        if (strlen(filename) > MAX_FILENAME_LEN) {
-            printf("Error: Filename too long\n");
-            exit(1);
-        }
-    } else if (argc == 2) {
-        filename = TEST_FILE;
-    } else {
-        printf("Usage: %s <server ip> [<requested file>]\n", argv[0]);
-        exit(1);
-    }
+    char* filename = checkArgs(argc, argv);
 
 	 // initialize UDP socket
     int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
@@ -151,7 +166,7 @@ int main(int argc, char *argv[]) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
     } else {
-        dprintf("UDP socket initialized, IP=%s, SOCID=%d\n", argv[1], soc);
+        dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
 
 	 // start transmission of file
