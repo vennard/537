@@ -64,7 +64,7 @@ bool spliceRatio(int rxLen, unsigned char *pkt) {
         
     }
 
-return true;
+    return true;
 }
 
 bool plotGraph(void) {
@@ -258,8 +258,8 @@ int main(int argc, char *argv[]) {
     int i;
     for (i = 0;i < 4;i++) printf("server%i: %s\n", i, saddr[i]);
 
-	exit(0); //DEBUG STOP
-    if (reqFile(soc, filename) == false) { //TODO remove middle arg
+	exit(0); //DEBUG STOP TODO
+    if (reqFile(soc, filename) == false) { 
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);
