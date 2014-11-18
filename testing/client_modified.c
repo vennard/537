@@ -18,35 +18,53 @@ static unsigned char pktIn[PKTLEN_DATA] = {0};
 static unsigned char pktOut[PKTLEN_MSG] = {0};
 static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
-//static unsigned char* payloadOut = pktOut + HDRLEN;
-//static pkthdr_common* hdrOut = (pkthdr_common*) pktOut;
 
 // data rate storage
-static int src1pkts, src2pkts, src3pkts, src4pkts = 0;
-static struct timeval tvStart, tvRecv, tvCheck;
-static char *s1, *s2, *s3, *s4; //server ip addresses
+static int srcpkts[4] = {0};
+static float srcRatio[4] = {0};
+static int sendRatio[4] = {0};
+static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
+static char *saddr[4]; //server ip addresses
+bool started = false;
 
-// calculate and send new ratios on to server
-bool newSpliceRatio(int src1, int src2, int src3, int src4) {
-	float total = src1 + src2 + src3 + src4;
-	float src1ratio = (float) src1 / total; 
-	float src2ratio = (float) src2 / total; 
-	float src3ratio = (float) src3 / total; 
-	float src4ratio = (float) src4 / total; 
-	float checkRatio = src1ratio + src2ratio + src3ratio + src4ratio;
-	if (checkRatio != 1) return false;
-    //TODO round ratios after * SPLICE_FRAME
-    //TODO check if update is necessary (standard deviation)
+bool spliceRatio(int rxLen, unsigned char *pkt) {
+    int checkTime, i;
+    //record where packet came from
+    int src = checkRxSrc(rxLen, pktIn, ID_CLIENT);
+    if ((src < 1)||(src > 4)) return false;
+    srcpkts[src - 1]++;
 
-	//TODO finish send new ratios to servers
-	/*
-	static unsigned char pktMsg[PKTLEN_MSG] = {0};
-    if (fillpkt(pkt, ID_CLIENT, 1, TYPE_SPLICE, 0, (unsigned char*) src1ratio, sizeof(src1ratio)) == false) {
-		 printf("Failed to fill splice ratio msg packet correctly\n");
-		 return false;
-	 }
-	 */
-	return true;
+    //timer trigger for splice ratio calculations
+    gettimeofday(&tvCheck, NULL);
+    if (!started) {
+        checkTime = timeDiff(&tvStart, &tvCheck);
+        started = true;
+    } else {
+        checkTime = timeDiff(&tvSplice, &tvCheck); 
+    }
+    gettimeofday(&tvSplice, NULL);
+    if (checkTime > SPLICE_DELAY) {
+        int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
+        for (i = 0;i < 4;i++) srcRatio[i] = srcpkts[i] / total;
+        float check = 0;
+        for (i = 0;i < 4;i++) check+=srcRatio[i];
+        if (check != 1) {
+            printf("Error with splice ratio check (= %.6f)\n",check);
+            return false;
+        }
+        //multiply ratio vs SPLICE_FRAME to find final ratio
+        for (i = 0;i < 4;i++) sendRatio[i] = (int) srcRatio[i] * SPLICE_FRAME;
+        
+        //TODO check if ratio's exceed threshold to send to servers
+        
+        //TODO send ratio to servers
+        //fillpkt(pkt, ID_CLIENT, 1, TYPE_SPLICE, 0, (unsigned char*) srcRatio[i], sizeof(srcRatio[i]))
+    
+        //TODO check for acknowledges from servers
+        
+    }
+
+return true;
 }
 
 bool plotGraph(void) {
@@ -68,44 +86,61 @@ bool plotGraph(void) {
 }
 
 bool reqFile(int soc, char* filename) {
-    struct sockaddr_in server1, server2, server3, server4, sender;
-    unsigned char pkt1[PKTLEN_MSG], pkt2[PKTLEN_MSG], pkt3[PKTLEN_MSG], pkt4[PKTLEN_MSG]; 
+    struct sockaddr_in sender;
+    struct sockaddr_in server[4];
+    unsigned char pkt[4][PKTLEN_MSG];
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-    unsigned int serverAcks[4] = {0, 0, 0, 0};
+    unsigned int serverReq[4] = {0, 0, 0, 0};
+    unsigned int serverAck[4] = {0, 0, 0, 0};
+    bool done = false;
 
-    //create targets
-    if (initHostStruct(&server1, s1, UDP_PORT) == false) {
-        return false;
-    }
-    if (initHostStruct(&server2, s2, UDP_PORT) == false) {
-        return false;
-    }
-    if (initHostStruct(&server3, s3, UDP_PORT) == false) {
-        return false;
-    }
-    if (initHostStruct(&server4, s4, UDP_PORT) == false) {
-        return false;
+    //create targets and fill request data for all servers
+    int i;
+    for (i = 0;i < 4;i++) {
+        if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
+        if (fillpkt(pkt[i], ID_CLIENT, i+1, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) return false; 
     }
 
-    // create the requests
-    if (fillpkt(pkt1, ID_CLIENT, ID_SERVER1, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
-        return false;
-    }
-    if (fillpkt(pkt2, ID_CLIENT, ID_SERVER2, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
-        return false;
-    }
-    if (fillpkt(pkt3, ID_CLIENT, ID_SERVER3, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
-        return false;
-    }
-    if (fillpkt(pkt4, ID_CLIENT, ID_SERVER4, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
-        return false;
-    }
-
+    //TODO start time from just before sending requests
     // send the request and receive a reply
     while (errCount++ < MAX_ERR_COUNT) {
-        
+        int i;
+        for (i = 0;i < 4;i++) {
+            //send request if not received ack
+            if (serverAck[i] != 1) sendto(soc, pkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
 
+            //read acks from servers
+            memset(pktIn, 0, PKTLEN_DATA);
+            int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
+            rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
+            if (rxRes == RX_TERMINATED) return false;
+            if (rxRes != RX_OK) continue; 
+            if ((hdrIn->src > 4)||(hdrIn->src < 1)) {
+                printf("Error: invalid server source\n");
+                return false;
+            }
+            if (hdrIn->type == TYPE_REQACK) {
+                serverAck[hdrIn->src-1] = 1; 
+            } else if (hdrIn->type == TYPE_REQNAK) {
+                printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
+                return false;
+            } else { //got invalid type
+                printf("Warning: received unexpected packet type, ignoring it\n");
+            }
+        }
+        //check for acks from each server
+        done = true;
+        for (i = 0;i < 4;i++) {
+            if (serverAck[i] == 0) done = false;
+        }
+        if (done) {
+            printf("Received acks from all servers!\n");
+            return true;
+        }
+    }
+        
+/*
 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server)); dprintPkt(pktOut, PKTLEN_MSG, true);
         memset(pktIn, 0, PKTLEN_DATA);
         int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
@@ -124,6 +159,7 @@ sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
 
         printf("Warning: Received an unexpected packet type, ignoring it\n");
     }
+    */
     printf("Error: Maximum number of request attempts reached\n");
     return false;
 }
@@ -167,35 +203,9 @@ bool receiveMovie(int soc, char** filename) {
             continue;
         }
 
-		  //TODO finish Collect data rate stats for splicing ratios
-		  int src = checkRxSrc(rxLen, pktIn, ID_CLIENT);
-		  switch (src) {
-			  case 1: 
-				  src1pkts++;
-				  break;
-			  case 2:
-				  src2pkts++;
-				  break;
-			  case 3:
-				  src3pkts++;
-				  break;
-			  case 4:
-				  src4pkts++;
-				  break;
-			  default:
-			  	  printf("Error: read invalid src address from incoming packet, exiting\n");
-			     return false;
-		  }
-		  gettimeofday(&tvCheck, NULL);
-		  unsigned int ratioCheck = timeDiff(&tvStart, &tvCheck);
-		  unsigned int ratioUpdate = ratioCheck % SPLICE_UPDATE_TIME;
-		  if ((ratioCheck > SPLICE_DELAY) && (ratioUpdate == 0)) {
-			  if (DEBUG) printf("Launching Splice Updater: pkts received 1 - %i, 2 - %i, 3 - %i, 4 - %i\n",src1pkts,src2pkts,src3pkts,src4pkts);
-			  if (newSpliceRatio(src1pkts, src2pkts, src3pkts, src4pkts)) return false;
-		  }
-		  //TODO end of splice ratio additions
+        if (spliceRatio(rxLen, pktIn) == false) return false; //access to splice ratio check and calculation
 
-        unsigned int diff = timeDiff(&tvStart, &tvRecv);
+		        unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
         }
@@ -224,10 +234,10 @@ char* checkArgs(int argc, char *argv[]) {
   } else {
 	 filename = TEST_FILE;
   }
-  s1 = argv[1];
-  s2 = argv[2];
-  s3 = argv[3];
-  s4 = argv[4];
+  saddr[0] = argv[1];
+  saddr[1] = argv[2];
+  saddr[2] = argv[3];
+  saddr[3] = argv[4];
   return filename;
 }
 
@@ -245,10 +255,11 @@ int main(int argc, char *argv[]) {
 
 	 // start transmission of file
     printf("Requesting file '%s' from servers with the following addresses\n", filename);
-    printf("   server1: %s\n   server2: %s\n   server3: %s\n   server4: %s\n", s1, s2, s3, s4);
+    int i;
+    for (i = 0;i < 4;i++) printf("server%i: %s\n", i, saddr[i]);
 
 	exit(0); //DEBUG STOP
-    if (reqFile(soc, argv[1], filename) == false) { //TODO remove middle arg
+    if (reqFile(soc, filename) == false) { //TODO remove middle arg
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);

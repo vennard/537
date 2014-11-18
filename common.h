@@ -7,6 +7,7 @@
 #ifndef COMMON_H
 #define	COMMON_H
 
+#define DEBUG 1
 
 /*******************
  * Includes 
@@ -33,8 +34,10 @@
 /*******************
  * Critical Variables
  *******************/
-#define SPLICE_UPDATE_TIME 100 //ms
-#define SPLICE_DELAY 200 //time before splice ratios change
+#define SPLICE_DELAY 200 //time between calculating splice ratios
+#define SPLICE_FRAME 10  //controls resolution of splice ratio from servers
+#define SPLICE_THRESH 1  //TODO standard deviation threshold needed to send update
+
 
 /*******************
  * General defines
@@ -82,10 +85,11 @@ typedef struct pkthdr_req {
 /* Source/Destination codes */
 /* Nodes 1-8: codes 1-8 */
 #define ID_CLIENT 8
-#define ID_SERVER1 10
-#define ID_SERVER2 20
-#define ID_SERVER3 30
-#define ID_SERVER4 40
+//below server defines are hardcoded MUST REMAIN to simplify code
+#define ID_SERVER1 1
+#define ID_SERVER2 2
+#define ID_SERVER3 3
+#define ID_SERVER4 4
 
 /* Change: Client has to communicate with all the servers, ID_SERVER define does not make sense */
 
