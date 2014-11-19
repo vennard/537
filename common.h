@@ -36,7 +36,7 @@
  *******************/
 #define SPLICE_DELAY 200 //time between calculating splice ratios
 #define SPLICE_FRAME 10  //controls resolution of splice ratio from servers
-#define SPLICE_THRESH 1  //TODO standard deviation threshold needed to send update
+#define SPLICE_THRESH 10  //TODO threshold of change needed to send update
 
 
 /*******************
@@ -81,6 +81,7 @@ typedef struct pkthdr_req {
 #define TYPE_FIN 6      // file streaming sucessfully finished
 #define TYPE_FAIL 7     // client/server failed, stop the streaming (not used now)
 #define TYPE_SPLICE 8   // splice ratio change msg
+#define TYPE_SPLICE_ACK 9 // ack from server for new splice ratio
 
 /* Source/Destination codes */
 /* Nodes 1-8: codes 1-8 */

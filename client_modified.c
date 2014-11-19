@@ -23,12 +23,46 @@ static unsigned char* payloadIn = pktIn + HDRLEN;
 static int srcpkts[4] = {0};
 static float srcRatio[4] = {0};
 static int sendRatio[4] = {0};
+static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
 static char *saddr[4]; //server ip addresses
 bool started = false;
+bool ackdNewRatios = true;
+static bool ackdRatio[4] = {false}; //all true if got ack for each new splice ratio
 
-bool spliceRatio(int rxLen, unsigned char *pkt) {
+bool sendRatios(){
+    //fillpkt(pkt, ID_CLIENT, 1, TYPE_SPLICE, 0, (unsigned char*) srcRatio[i], sizeof(srcRatio[i]))
+    return true;
+}
+
+bool spliceRatio(int rxLen) {
     int checkTime, i;
+
+    //check for acks from new splicing ratios first
+    if ((!ackdNewRatios) && (hdrIn->type == TYPE_SPLICE_ACK)) {
+        ackdRatio[hdrIn->src-1] = true;
+        return true;
+    } 
+
+    //TODO fail update if splice ratios not ackd before splice update frame
+    //resend splice ratios if not received valid acks in 1/4 SPLICE_DELAY
+    ackdNewRatios = true;
+    for (i = 0;i < 4;i++) {
+        if (ackdRatio[i] == false) ackdNewRatios = false;
+    }
+    if (!ackdNewRatios) {
+        gettimeofday(&tvCheck, NULL);
+        checkTime = timeDiff(&tvSplice, &tvCheck);
+        if (checkTime > (SPLICE_DELAY / 4)) {
+            //resend ratios and reset splice delay 
+            //sendRatios();
+            gettimeofday(&tvSplice, NULL);
+        }
+    }
+
+    //check that packet is of valid type before recording
+    if (hdrIn->type != TYPE_DATA) return false;
+
     //record where packet came from
     int src = checkRxSrc(rxLen, pktIn, ID_CLIENT);
     if ((src < 1)||(src > 4)) return false;
@@ -38,12 +72,12 @@ bool spliceRatio(int rxLen, unsigned char *pkt) {
     gettimeofday(&tvCheck, NULL);
     if (!started) {
         checkTime = timeDiff(&tvStart, &tvCheck);
-        started = true;
     } else {
         checkTime = timeDiff(&tvSplice, &tvCheck); 
     }
-    gettimeofday(&tvSplice, NULL);
     if (checkTime > SPLICE_DELAY) {
+        gettimeofday(&tvSplice, NULL);
+        started = true;
         int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
         for (i = 0;i < 4;i++) srcRatio[i] = srcpkts[i] / total;
         float check = 0;
@@ -52,18 +86,24 @@ bool spliceRatio(int rxLen, unsigned char *pkt) {
             printf("Error with splice ratio check (= %.6f)\n",check);
             return false;
         }
-        //multiply ratio vs SPLICE_FRAME to find final ratio
+        //multiply ratio * SPLICE_FRAME to find final ratio
         for (i = 0;i < 4;i++) sendRatio[i] = (int) srcRatio[i] * SPLICE_FRAME;
-        
-        //TODO check if ratio's exceed threshold to send to servers
-        
-        //TODO send ratio to servers
-        //fillpkt(pkt, ID_CLIENT, 1, TYPE_SPLICE, 0, (unsigned char*) srcRatio[i], sizeof(srcRatio[i]))
-    
-        //TODO check for acknowledges from servers
-        
+        if ((oldRatio[0] == 0) && (oldRatio[1] == 0) && (oldRatio[2] == 0) && (oldRatio[3] == 0)) {
+            for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
+        } else {
+            //calculate total of absolute value of change of each ratio
+            int change = 0;
+            for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]);
+            for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
+            if (change > SPLICE_THRESH) {
+                //send ratio to servers
+                printf("Change threshold exceeded, sending new splice ratios\n");
+                //sendRatios();
+                ackdNewRatios = false;
+                for (i = 0;i < 4;i++) ackdRatio[i] = false;
+            }
+        }
     }
-
     return true;
 }
 
@@ -102,7 +142,6 @@ bool reqFile(int soc, char* filename) {
         if (fillpkt(pkt[i], ID_CLIENT, i+1, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) return false; 
     }
 
-    //TODO start time from just before sending requests
     // send the request and receive a reply
     gettimeofday(&tvStart, NULL); //start time from acknowledge of start request
     while (errCount++ < MAX_ERR_COUNT) {
@@ -141,27 +180,6 @@ bool reqFile(int soc, char* filename) {
             return true;
         }
     }
-        
-/*
-sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server)); dprintPkt(pktOut, PKTLEN_MSG, true);
-        memset(pktIn, 0, PKTLEN_DATA);
-        int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
-        rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
-
-        if (rxRes == RX_TERMINATED) return false;
-        if (rxRes != RX_OK) continue;
-        if (hdrIn->type == TYPE_REQACK){
-    		  gettimeofday(&tvStart, NULL); //start time from acknowledge of start request
-			  return true;
-		  }
-        if (hdrIn->type == TYPE_REQNAK) {
-            printf("Error: Server refused to stream the requested file\n");
-            return false;
-        }
-
-        printf("Warning: Received an unexpected packet type, ignoring it\n");
-    }
-    */
     printf("Error: Maximum number of request attempts reached\n");
     return false;
 }
@@ -195,19 +213,19 @@ bool receiveMovie(int soc, char** filename) {
             continue;
         }
 
+        if (spliceRatio(rxLen) == false) return false; //access to splice ratio check and calculation
+
         if (hdrIn->type == TYPE_FIN) {
             fclose(graphDataFile);
             fclose(streamedFile);
             return true;
-        } else if (hdrIn->type != TYPE_DATA) {
+        } else if (hdrIn->type != TYPE_DATA) { //TODO make expection for ack from new splice ratio
             printf("Warning: Received an unexpected packet type, ignoring it\n");
             errCount++;
             continue;
         }
 
-        if (spliceRatio(rxLen, pktIn) == false) return false; //access to splice ratio check and calculation
-
-		        unsigned int diff = timeDiff(&tvStart, &tvRecv);
+        unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
         }
