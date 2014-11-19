@@ -37,6 +37,7 @@ static int lastPkt = 0;
 bool spliceTx(bool send) {
     uint8_t i, j;
     if (send) { 
+    if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
         //calculate splice ratio start frame
         int seqGap = lastPkt + SPLICE_GAP;
         unsigned char sPkt[4][PKTLEN_MSG];
