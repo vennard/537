@@ -7,6 +7,7 @@
 
 #define _BSD_SOURCE // for usleap
 #include "common.h"
+#include "common.c"
 #define TX_DELAY 100000
 
 // File database
@@ -24,12 +25,15 @@ static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
 static unsigned char* payloadOut = pktOut + HDRLEN;
 
+static int serverName; //holds name of server (1-4)
+
 bool lookupFile(char* file) {
     if (file == NULL) {
         return false;
     }
     unsigned int arrSize = sizeof (fileDb) / sizeof (fileDb[0]);
-    for (unsigned int i = 0; i < arrSize; i++) {
+    int i;
+    for (i = 0; i < arrSize; i++) {
         if (strcmp(fileDb[i], file) == 0) {
             return true;
         }
@@ -44,7 +48,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     while (errCount++ < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_MSG);
         int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
-        rxRes = checkRxStatus(rxRes, pktIn, ID_SERVER);
+        rxRes = checkRxStatus(rxRes, pktIn, serverName);
 
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) continue;
@@ -63,7 +67,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
             printf("Error: Requested file does not exist\n");
         }
 
-        if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
+        if (fillpkt(pktOut, serverName, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
             return false;
         }
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
@@ -93,7 +97,7 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     unsigned int readSize = PKTLEN_DATA - HDRLEN;
     unsigned int seq = 1;
     while (readSize == PKTLEN_DATA - HDRLEN) {        
-        if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
+        if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
             return false;
         }
         readSize = fread(payloadOut, 1, PKTLEN_DATA - HDRLEN, streamFile);
@@ -110,7 +114,7 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     }
 
     fclose(streamFile);
-    if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, TYPE_FIN, seq, NULL, 0) == false) {
+    if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_FIN, seq, NULL, 0) == false) {
         return false;
     }
     sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
@@ -118,12 +122,23 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     return true;
 }
 
+void checkArgs(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <server number>\n",argv[0]);
+        exit(1);
+    } else {
+        char *ptr;
+        serverName = (int) strtol(argv[1],&ptr,10);
+        if ((serverName < 1) || (serverName > 4)) {
+            printf("Invalid server number, must be 1-4\n");
+            exit(1);
+        }
+        printf("Server %i selected.\n",serverName);
+    }
+}
 int main(int argc, char *argv[]) {
     // check the arguments
-    if (argc > 1) {
-        printf("No arguments expected, Usage: %s\n", argv[0]);
-        exit(1);
-    }
+    checkArgs(argc, argv);
 
     int soc = udpInit(UDP_PORT, 0);
     if (soc == -1) {

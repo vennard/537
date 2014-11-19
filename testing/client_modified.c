@@ -104,6 +104,7 @@ bool reqFile(int soc, char* filename) {
 
     //TODO start time from just before sending requests
     // send the request and receive a reply
+    gettimeofday(&tvStart, NULL); //start time from acknowledge of start request
     while (errCount++ < MAX_ERR_COUNT) {
         int i;
         for (i = 0;i < 4;i++) {
@@ -122,6 +123,7 @@ bool reqFile(int soc, char* filename) {
             }
             if (hdrIn->type == TYPE_REQACK) {
                 serverAck[hdrIn->src-1] = 1; 
+                printf("Got ack from server %i!\n",hdrIn->src);
             } else if (hdrIn->type == TYPE_REQNAK) {
                 printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
                 return false;
@@ -258,7 +260,6 @@ int main(int argc, char *argv[]) {
     int i;
     for (i = 0;i < 4;i++) printf("server%i: %s\n", i, saddr[i]);
 
-	exit(0); //DEBUG STOP TODO
     if (reqFile(soc, filename) == false) { 
         printf("Error: Request failed, program stopped\n");
         close(soc);
@@ -266,6 +267,7 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
+	exit(0); //DEBUG STOP TODO
 
 	 // receive movie
     if (receiveMovie(soc, &filename) == false) {
