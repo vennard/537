@@ -162,7 +162,7 @@ bool fillpktSplice(
     spl->common_hdr.src = ID_CLIENT;
     spl->common_hdr.dst = dst;
     spl->common_hdr.type = TYPE_SPLICE;
-    spl->common_hdr.seq = 0;
+    spl->common_hdr.seq = 9;
     spl->sseq = sseq;
     memcpy(spl->ratios, ratios, sizeof(ratios));
 
