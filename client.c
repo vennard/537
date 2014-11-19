@@ -17,13 +17,14 @@ static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
 //static unsigned char* payloadOut = pktOut + HDRLEN;
 
-static int src1pkts, src2pkts, src3pkts, src4pkts = 0;
-static struct timeval tvStart, tvRecv, tvCheck;
+//static int src1pkts, src2pkts, src3pkts, src4pkts = 0;
+//static struct timeval tvStart, tvRecv, tvCheck;
 static char *s1, *s2, *s3, *s4; //server ip addresses
 
-bool spliceRatio(unsigned char *pkt){
-    return true;
+bool spliceRatio(unsigned char *pkt) {
+    return pkt;
 }
+
 bool plotGraph(void) {
     char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + strlen(GRAPH_OUTPUT_FILE) + 10];
 
@@ -52,7 +53,7 @@ bool reqFile(int soc, char* serverIpStr, char* filename) {
     }
 
     // create the request
-    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
+    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) {
         return false;
     }
 
@@ -137,30 +138,32 @@ bool receiveMovie(int soc, char** filename) {
     fclose(streamedFile);
     return false;
 }
+
 char* checkArgs(int argc, char *argv[]) {
-  char *filename;
-  if ((argc != 6) && (argc != 5)) {
-	 printf("Usage: %s <server 1 ip> <server 2 ip> <server 3 ip> <server 4 ip> [<requested file>]\n",argv[0]);
-	 exit(1);
-  } else if (argc == 6) {
-	 filename = argv[5];
-	 if (strlen(filename) > MAX_FILENAME_LEN) {
-		printf("Error: Filename too long\n");
-		exit(1);
-	 }
-  } else {
-	 filename = TEST_FILE;
-  }
-  s1 = argv[1];
-  s2 = argv[2];
-  s3 = argv[3];
-  s4 = argv[4];
-  return filename;
+    char *filename;
+    if ((argc != 6) && (argc != 5)) {
+        printf("Usage: %s <server 1 ip> <server 2 ip> <server 3 ip> <server 4 ip> [<requested file>]\n", argv[0]);
+        exit(1);
+    } else if (argc == 6) {
+        filename = argv[5];
+        if (strlen(filename) > MAX_FILENAME_LEN) {
+            printf("Error: Filename too long\n");
+            exit(1);
+        }
+    } else {
+        filename = TEST_FILE;
+    }
+    s1 = argv[1];
+    s2 = argv[2];
+    s3 = argv[3];
+    s4 = argv[4];
+    return filename;
 }
+
 int main(int argc, char *argv[]) {
     char* filename = checkArgs(argc, argv);
 
-	 // initialize UDP socket
+    // initialize UDP socket
     int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
@@ -169,7 +172,7 @@ int main(int argc, char *argv[]) {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
 
-	 // start transmission of file
+    // start transmission of file
     printf("Requesting file '%s' from the server\n", filename);
     if (reqFile(soc, argv[1], filename) == false) {
         printf("Error: Request failed, program stopped\n");
@@ -179,7 +182,7 @@ int main(int argc, char *argv[]) {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
 
-	 // receive movie
+    // receive movie
     if (receiveMovie(soc, &filename) == false) {
         printf("Error: Error during the file streaming, program stopped\n");
         close(soc);

@@ -44,7 +44,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     while (errCount++ < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_MSG);
         int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
-        rxRes = checkRxStatus(rxRes, pktIn, ID_SERVER);
+        rxRes = checkRxStatus(rxRes, pktIn, ID_SERVER1);
 
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) continue;
@@ -63,7 +63,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
             printf("Error: Requested file does not exist\n");
         }
 
-        if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
+        if (fillpkt(pktOut, ID_SERVER1, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
             return false;
         }
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
@@ -92,8 +92,8 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
 
     unsigned int readSize = PKTLEN_DATA - HDRLEN;
     unsigned int seq = 1;
-    while (readSize == PKTLEN_DATA - HDRLEN) {        
-        if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
+    while (readSize == PKTLEN_DATA - HDRLEN) {
+        if (fillpkt(pktOut, ID_SERVER1, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
             return false;
         }
         readSize = fread(payloadOut, 1, PKTLEN_DATA - HDRLEN, streamFile);
@@ -110,7 +110,7 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     }
 
     fclose(streamFile);
-    if (fillpkt(pktOut, ID_SERVER, ID_CLIENT, TYPE_FIN, seq, NULL, 0) == false) {
+    if (fillpkt(pktOut, ID_SERVER1, ID_CLIENT, TYPE_FIN, seq, NULL, 0) == false) {
         return false;
     }
     sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
