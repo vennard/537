@@ -37,7 +37,6 @@ static int lastPkt = 0;
 bool spliceTx(bool send) {
     uint8_t i, j;
     if (send) { 
-    if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
         //calculate splice ratio start frame
         int seqGap = lastPkt + SPLICE_GAP;
         unsigned char sPkt[4][PKTLEN_MSG];
@@ -46,6 +45,7 @@ bool spliceTx(bool send) {
         }
         //send new splice ratios
         for (i = 0;i < 4;i++) {
+            if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
             sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
         }
         printf("Sent splice ratios!!!\n");

@@ -60,16 +60,18 @@ bool lookupFile(char* file) {
 
 bool receiveSplice(int soc, struct sockaddr_in* client) {
     unsigned int clientSize = sizeof (*client);
+    pkthdr_spl* splIn = (pkthdr_spl*) pktIn;
     int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
         rxRes = checkRxStatus(rxRes, pktIn, serverName);
 
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) return false;
 
-        if (hdrIn->type != TYPE_SPLICE) {
+        if (splIn->common_hdr.type != TYPE_SPLICE) {
             printf("Warning: DID NOT GET SPLICE!\n");
             return false;
         }
+        printf("splIn->sseq = %i\n",splIn->sseq);
         printf("finished splice check\n");
 
     return true;
