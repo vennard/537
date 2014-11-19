@@ -199,6 +199,8 @@ int main(int argc, char *argv[]) {
         if (receiveSplice(soc, &client) == false) {
             printf("Error: Invalid splice ratio request, server stopped\n");
             continue;
+        } else {
+            printf("Got splice ratio!\n");
         }
         if (receiveReq(soc, &client, &filename) == false) {
             printf("Error: Invalid client request, server stopped\n");
