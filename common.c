@@ -148,6 +148,29 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
     }
 }
 
+bool fillpktSplice( 
+        unsigned char* buf, uint8_t dst, 
+        uint32_t sseq, uint32_t ratios[4]) {
+
+    if (buf == NULL) {
+        dprintf("Error: Packet could not be created\n");
+        return false;
+    }
+
+    memset(buf, 0, PKTLEN_MSG);
+    pkthdr_spl* spl = (pkthdr_spl*) buf;
+    spl->common_hdr.src = ID_CLIENT;
+    spl->common_hdr.dst = dst;
+    spl->common_hdr.type = TYPE_SPLICE;
+    spl->common_hdr.seq = 0;
+    spl->sseq = sseq;
+    memcpy(spl->ratios, ratios, sizeof(ratios));
+
+    return true;
+}
+
+
+
 bool fillpkt(
         unsigned char* buf,
         uint8_t src, uint8_t dst, uint8_t type, uint32_t seq,

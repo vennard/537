@@ -35,18 +35,13 @@ static int lastPkt = 0;
 
 
 bool spliceTx(bool send) {
-    int i, j;
+    uint8_t i, j;
     if (send) { 
         //calculate splice ratio start frame
         int seqGap = lastPkt + SPLICE_GAP;
-        pkthdr_spl* sPkt[4];
+        unsigned char sPkt[4][PKTLEN_MSG];
         for (i = 0;i < 4;i++) {
-            sPkt[i]->common_hdr.src = ID_CLIENT;
-            sPkt[i]->common_hdr.dst = i + 1;
-            sPkt[i]->common_hdr.type = TYPE_SPLICE;
-            sPkt[i]->common_hdr.seq = 0;
-            for (j = 0;j < 4;j++) sPkt[i]->ratios[j] = sendRatio[j];
-            sPkt[i]->sseq = seqGap; 
+           if (fillpktSplice(sPkt[i], (i+1), seqGap, sendRatio) == false) return false; 
         }
         //send new splice ratios
         for (i = 0;i < 4;i++) {
@@ -314,6 +309,7 @@ int main(int argc, char *argv[]) {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
 
+    printf("Entering splice\n");
     if (spliceTx(true)) printf("Splice success!");
 	exit(0); //DEBUG STOP TODO
 
