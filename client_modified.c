@@ -18,10 +18,12 @@ static unsigned char pktIn[PKTLEN_DATA] = {0};
 static unsigned char pktOut[PKTLEN_MSG] = {0};
 static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
+static int sock;
+static struct sockaddr_in server[4];
 
 // data rate storage
 static float srcpkts[4] = {0};
-static int sendRatio[4] = {0};
+static int sendRatio[4] = {0,0,0,0};
 static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
 static char *saddr[4]; //server ip addresses
@@ -29,15 +31,32 @@ bool started = false;
 bool startedSplice = false;
 bool ackdNewRatios = true;
 static bool ackdRatio[4] = {false}; //all true if got ack for each new splice ratio
+static int lastPkt = 0;
 
-bool sendRatios(){
-    //fillpkt(pkt, ID_CLIENT, 1, TYPE_SPLICE, 0, (unsigned char*) srcRatio[i], sizeof(srcRatio[i]))
-    return true;
-}
 
-bool spliceRatio(int rxLen) {
-    int checkTime, i;
+bool spliceTx(bool send) {
+    int i, j;
+    if (send) { 
+        //calculate splice ratio start frame
+        int seqGap = lastPkt + SPLICE_GAP;
+        pkthdr_spl* sPkt[4];
+        for (i = 0;i < 4;i++) {
+            sPkt[i]->common_hdr.src = ID_CLIENT;
+            sPkt[i]->common_hdr.dst = i + 1;
+            sPkt[i]->common_hdr.type = TYPE_SPLICE;
+            sPkt[i]->common_hdr.seq = 0;
+            for (j = 0;j < 4;j++) sPkt[i]->ratios[j] = sendRatio[j];
+            sPkt[i]->sseq = seqGap; 
+        }
+        //send new splice ratios
+        for (i = 0;i < 4;i++) {
+            sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+        }
+        printf("Sent splice ratios!!!\n");
+        return true;
 
+
+/*
     //check for acks from new splicing ratios first
     if ((!ackdNewRatios) && (hdrIn->type == TYPE_SPLICE_ACK)) {
         ackdRatio[hdrIn->src-1] = true;
@@ -46,7 +65,6 @@ bool spliceRatio(int rxLen) {
 
     //TODO fail update if splice ratios not ackd before splice update frame
     //resend splice ratios if not received valid acks in 1/4 SPLICE_DELAY
-    /*
     ackdNewRatios = true;
     for (i = 0;i < 4;i++) {
         if (ackdRatio[i] == false) ackdNewRatios = false;
@@ -63,7 +81,16 @@ bool spliceRatio(int rxLen) {
     }
     */
 
-    //check that packet is of valid type before recording
+
+    } else { //check for splice acknowledges
+    }
+    return false;
+}
+
+bool spliceRatio(int rxLen) {
+    int checkTime, i;
+
+        //check that packet is of valid type before recording
     if (hdrIn->type != TYPE_DATA) return false;
 
     //record where packet came from
@@ -111,9 +138,7 @@ bool spliceRatio(int rxLen) {
             if (change > SPLICE_THRESH) {
                 //send ratio to servers
                 printf("Change threshold exceeded, sending new splice ratios\n");
-                //sendRatios();
-                //ackdNewRatios = false;
-                //for (i = 0;i < 4;i++) ackdRatio[i] = false;
+                if (!spliceTx(true)) return false;
             }
         }
     }
@@ -140,7 +165,6 @@ bool plotGraph(void) {
 
 bool reqFile(int soc, char* filename) {
     struct sockaddr_in sender;
-    struct sockaddr_in server[4];
     unsigned char pkt[4][PKTLEN_MSG];
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
@@ -238,6 +262,9 @@ bool receiveMovie(int soc, char** filename) {
             continue;
         }
 
+        //store last sequence number received
+        lastPkt = hdrIn->seq;
+
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
@@ -279,12 +306,16 @@ int main(int argc, char *argv[]) {
 
 	 // initialize UDP socket
     int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
+    sock = soc;
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
+
+    if (spliceTx(true)) printf("Splice success!");
+	exit(0); //DEBUG STOP TODO
 
 	 // start transmission of file
     printf("Requesting file '%s' from servers with the following addresses\n", filename);

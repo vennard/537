@@ -65,7 +65,7 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
     return soc;
 }
 
-//TODO Change ERROR codes to be negative numbers - otherwise conflicts with node names
+//TODO change error codes away from server names
 int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
  	 if ((pkt == NULL) || (expDst < 1)) {
         printf("Warning: Unknown Rx error occurred\n");

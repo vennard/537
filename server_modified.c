@@ -58,6 +58,23 @@ bool lookupFile(char* file) {
     return false;
 }
 
+bool receiveSplice(int soc, struct sockaddr_in* client) {
+    unsigned int clientSize = sizeof (*client);
+    int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
+        rxRes = checkRxStatus(rxRes, pktIn, serverName);
+
+        if (rxRes == RX_TERMINATED) return false;
+        if (rxRes != RX_OK) return false;
+
+        if (hdrIn->type != TYPE_SPLICE) {
+            printf("Warning: DID NOT GET SPLICE!\n");
+            return false;
+        }
+        printf("finished splice check\n");
+
+    return true;
+}
+
 bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     unsigned int clientSize = sizeof (*client);
     unsigned int errCount = 0;
@@ -69,7 +86,6 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
 
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) continue;
-
 
         if (hdrIn->type != TYPE_REQ) {
             printf("Warning: Received an unexpected packet type, ignoring it\n");
@@ -179,6 +195,11 @@ int main(int argc, char *argv[]) {
     char* filename;
     while (1) {
         printf("Waiting for a request from client\n");
+        //TODO below testing
+        if (receiveSplice(soc, &client) == false) {
+            printf("Error: Invalid splice ratio request, server stopped\n");
+            continue;
+        }
         if (receiveReq(soc, &client, &filename) == false) {
             printf("Error: Invalid client request, server stopped\n");
             continue;
