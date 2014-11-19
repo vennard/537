@@ -46,6 +46,7 @@ bool spliceRatio(int rxLen) {
 
     //TODO fail update if splice ratios not ackd before splice update frame
     //resend splice ratios if not received valid acks in 1/4 SPLICE_DELAY
+    /*
     ackdNewRatios = true;
     for (i = 0;i < 4;i++) {
         if (ackdRatio[i] == false) ackdNewRatios = false;
@@ -60,6 +61,7 @@ bool spliceRatio(int rxLen) {
             gettimeofday(&tvSplice, NULL);
         }
     }
+    */
 
     //check that packet is of valid type before recording
     if (hdrIn->type != TYPE_DATA) return false;
@@ -70,19 +72,23 @@ bool spliceRatio(int rxLen) {
     srcpkts[src - 1]++;
 
     //timer trigger for splice ratio calculations
-    gettimeofday(&tvCheck, NULL);
     if (!started) {
-        checkTime = timeDiff(&tvStart, &tvCheck);
+        gettimeofday(&tvSplice, NULL);
+        started = true;
+        return true;
+        //checkTime = timeDiff(&tvStart, &tvCheck);
     } else {
+        gettimeofday(&tvCheck, NULL);
         checkTime = timeDiff(&tvSplice, &tvCheck); 
+        printf("CHECKTIME = %i\n",checkTime);
     }
     if (checkTime > SPLICE_DELAY) {
         //DEBUG
         printf("Entered Splice Check at time %i, SOURCE PACKETS:!\n",checkTime);
-        for (i = 0;i < 4;i++) printf("%i: %i\n",i,srcPkts[i]);
+        for (i = 0;i < 4;i++) printf("%i: %i\n",i,srcpkts[i]);
 
         gettimeofday(&tvSplice, NULL);
-        started = true;
+        //started = true;
         int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
         for (i = 0;i < 4;i++) srcRatio[i] = srcpkts[i] / total;
         float check = 0;
