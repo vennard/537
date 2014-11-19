@@ -20,7 +20,7 @@ static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
 
 // data rate storage
-static int srcpkts[4] = {0};
+static float srcpkts[4] = {0};
 static int sendRatio[4] = {0};
 static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
@@ -84,11 +84,11 @@ bool spliceRatio(int rxLen) {
     if (checkTime > SPLICE_DELAY) {
         //DEBUG
         printf("Entered Splice Check at time %i, SOURCE PACKETS:\n",checkTime);
-        for (i = 0;i < 4;i++) printf("%i: %i\n",i,srcpkts[i]);
+        for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcpkts[i]);
 
         gettimeofday(&tvSplice, NULL);
         //started = true;
-        int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
+        float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
         printf("Total = %i\n",total);
         float srcRatio[4];
         for (i = 0;i < 4;i++) srcRatio[i] = (srcpkts[i] / total);
