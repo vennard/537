@@ -169,9 +169,11 @@ int main(int argc, char *argv[]) {
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
+    /*
     printf("SpliceRatios:\n");
     int i;
     for (i = 0;i < 4;i++) printf("Server%i - %i\n", i, spliceRatios[i]);
+    */
 
     struct sockaddr_in client;
     char* filename;
