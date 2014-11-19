@@ -26,6 +26,23 @@ static unsigned char* payloadIn = pktIn + HDRLEN;
 static unsigned char* payloadOut = pktOut + HDRLEN;
 
 static int serverName; //holds name of server (1-4)
+static int spliceRatios[4] = {(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME)};
+static int nSpliceRatios[4] = {0,0,0,0}; //new splice ratios
+static int sBucket[4] = {0,0,0,0};
+static int spliceSeqSwitch = 0; //frame to switch to new ratios on
+static bool emptyBucket = true;
+static int syncSeq = 0; //overall sequence number to keep track of splice
+
+int getSplice() {
+    int i;
+    int j = 0;
+    if (emptyBucket) {
+       for (i = 0;i < 4;i++) sBucket[i] = spliceRatios[i];
+       emptyBucket = false;
+    }
+    //TODO needs to be finished
+    return 0;
+}
 
 bool lookupFile(char* file) {
     if (file == NULL) {
@@ -52,6 +69,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
 
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) continue;
+
 
         if (hdrIn->type != TYPE_REQ) {
             printf("Warning: Received an unexpected packet type, ignoring it\n");
@@ -97,6 +115,8 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     unsigned int readSize = PKTLEN_DATA - HDRLEN;
     unsigned int seq = 1;
     while (readSize == PKTLEN_DATA - HDRLEN) {        
+        //TODO get sequence number from splice ratio
+        //int sendseq = getSplice(seq); 
         if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
             return false;
         }
@@ -110,6 +130,9 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
 
         seq++;
         if ((isTest == true) && (seq == EMPTY_PKT_COUNT)) break;
+
+        //TODO check for new splice ratio from client & for splice update frame
+
         usleep(TX_DELAY);
     }
 
@@ -137,7 +160,6 @@ void checkArgs(int argc, char *argv[]) {
     }
 }
 int main(int argc, char *argv[]) {
-    // check the arguments
     checkArgs(argc, argv);
 
     int soc = udpInit(UDP_PORT, 0);
@@ -147,10 +169,12 @@ int main(int argc, char *argv[]) {
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
+    printf("SpliceRatios:\n");
+    int i;
+    for (i = 0;i < 4;i++) printf("Server%i - %i\n", i, spliceRatios[i]);
 
     struct sockaddr_in client;
     char* filename;
-
     while (1) {
         printf("Waiting for a request from client\n");
         if (receiveReq(soc, &client, &filename) == false) {
@@ -158,7 +182,7 @@ int main(int argc, char *argv[]) {
             continue;
         } else {
             printf("A request from %s received, requested file: '%s'\n",inet_ntoa(client.sin_addr), filename);
-            printf("Streaming the requested file...\n");
+            printf("Streaming the requested file with initial splice number = %i...\n",spliceRatios[serverName-1]);
             exit(0); //DEBUG STOP TODO
         }
 
