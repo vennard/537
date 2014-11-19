@@ -56,6 +56,7 @@ bool spliceRatio(int rxLen) {
         if (checkTime > (SPLICE_DELAY / 4)) {
             //resend ratios and reset splice delay 
             //sendRatios();
+            //TODO add support for completely congested lines
             gettimeofday(&tvSplice, NULL);
         }
     }
@@ -76,12 +77,18 @@ bool spliceRatio(int rxLen) {
         checkTime = timeDiff(&tvSplice, &tvCheck); 
     }
     if (checkTime > SPLICE_DELAY) {
+        //DEBUG
+        printf("Entered Splice Check!\n");
         gettimeofday(&tvSplice, NULL);
         started = true;
         int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
         for (i = 0;i < 4;i++) srcRatio[i] = srcpkts[i] / total;
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
+        //DEBUG
+        printf("Fractions:\n");
+        for (i = 0;i < 4;i++) printf("%i: %.6f\n",i,srcRatio[i]);
+        printf("\n Check value: %.6f\n",check);
         if (check != 1) {
             printf("Error with splice ratio check (= %.6f)\n",check);
             return false;
@@ -91,16 +98,23 @@ bool spliceRatio(int rxLen) {
         if ((oldRatio[0] == 0) && (oldRatio[1] == 0) && (oldRatio[2] == 0) && (oldRatio[3] == 0)) {
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
         } else {
+            //DEBUG
+            printf("Changing Splice Ratio!\n");
+            for (i = 0;i < 4;i++) printf("RATIO %i: %i\n",i,sendRatio[i]);
+
+            exit(0); //TODO debug exit
+
             //calculate total of absolute value of change of each ratio
             int change = 0;
             for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]);
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
+            for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
             if (change > SPLICE_THRESH) {
                 //send ratio to servers
                 printf("Change threshold exceeded, sending new splice ratios\n");
                 //sendRatios();
-                ackdNewRatios = false;
-                for (i = 0;i < 4;i++) ackdRatio[i] = false;
+                //ackdNewRatios = false;
+                //for (i = 0;i < 4;i++) ackdRatio[i] = false;
             }
         }
     }
@@ -285,7 +299,6 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
-	exit(0); //DEBUG STOP TODO
 
 	 // receive movie
     if (receiveMovie(soc, &filename) == false) {
@@ -295,6 +308,8 @@ int main(int argc, char *argv[]) {
     } else {
         printf("File successfully transfered, local copy: client_%s\n", filename);
     }
+
+	exit(0); //DEBUG STOP TODO
 
     // clean up resources and plot 
     close(soc);

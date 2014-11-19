@@ -183,7 +183,6 @@ int main(int argc, char *argv[]) {
         } else {
             printf("A request from %s received, requested file: '%s'\n",inet_ntoa(client.sin_addr), filename);
             printf("Streaming the requested file with initial splice number = %i...\n",spliceRatios[serverName-1]);
-            exit(0); //DEBUG STOP TODO
         }
 
         if (streamFile(soc, &client, filename) == false) {
