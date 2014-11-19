@@ -78,7 +78,9 @@ bool spliceRatio(int rxLen) {
     }
     if (checkTime > SPLICE_DELAY) {
         //DEBUG
-        printf("Entered Splice Check!\n");
+        printf("Entered Splice Check at time %i, SOURCE PACKETS:!\n",checkTime);
+        for (i = 0;i < 4;i++) printf("%i: %i\n",i,srcPkts[i]);
+
         gettimeofday(&tvSplice, NULL);
         started = true;
         int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
@@ -101,8 +103,6 @@ bool spliceRatio(int rxLen) {
             //DEBUG
             printf("Changing Splice Ratio!\n");
             for (i = 0;i < 4;i++) printf("RATIO %i: %i\n",i,sendRatio[i]);
-
-            exit(0); //TODO debug exit
 
             //calculate total of absolute value of change of each ratio
             int change = 0;
