@@ -2,8 +2,9 @@
 
 # Ping test to check availability of all 7 nodes
 # To be run on client (Node 8)
+# must use chmod a+x ping_test; then ./ping_test.sh to execute
 
-ip=("10.10.6.1", "10.10.5.1", "10.10.4.1", "10.10.3.1", "10.10.2.1", "10.10.1.1", "10.10.0.1")
+ip=(10.10.6.1 10.10.5.1 10.10.4.1 10.10.3.1 10.10.2.1 10.10.1.1 10.10.7.1)
 up=0
 ind=0
 errors=""
