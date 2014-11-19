@@ -26,6 +26,7 @@ static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
 static char *saddr[4]; //server ip addresses
 bool started = false;
+bool startedSplice = false;
 bool ackdNewRatios = true;
 static bool ackdRatio[4] = {false}; //all true if got ack for each new splice ratio
 
@@ -79,43 +80,35 @@ bool spliceRatio(int rxLen) {
     } else {
         gettimeofday(&tvCheck, NULL);
         checkTime = timeDiff(&tvSplice, &tvCheck); 
-        printf("CHECKTIME = %i\n",checkTime);
     }
     if (checkTime > SPLICE_DELAY) {
-        //DEBUG
-        printf("Entered Splice Check at time %i, SOURCE PACKETS:\n",checkTime);
-        for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcpkts[i]);
-
         gettimeofday(&tvSplice, NULL);
-        //started = true;
         float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
-        printf("Total = %i\n",total);
+        printf("Total = %f\n",total);
         float srcRatio[4];
         for (i = 0;i < 4;i++) srcRatio[i] = (srcpkts[i] / total);
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
+        for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
         //DEBUG
-        printf("Fractions:\n");
-        for (i = 0;i < 4;i++) printf("%i: %.6f\n",i,srcRatio[i]);
-        printf("\n Check value: %.6f\n",check);
+        printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
+        for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
+        //DEBUG
         if (check != 1) {
             printf("Error with splice ratio check (= %.6f)\n",check);
             return false;
         }
         //multiply ratio * SPLICE_FRAME to find final ratio
-        for (i = 0;i < 4;i++) sendRatio[i] = (int) srcRatio[i] * SPLICE_FRAME;
-        if ((oldRatio[0] == 0) && (oldRatio[1] == 0) && (oldRatio[2] == 0) && (oldRatio[3] == 0)) {
+        for (i = 0;i < 4;i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
+        if (!startedSplice) {
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
+            startedSplice = true;
         } else {
-            //DEBUG
-            printf("Changing Splice Ratio!\n");
-            for (i = 0;i < 4;i++) printf("RATIO %i: %i\n",i,sendRatio[i]);
-
             //calculate total of absolute value of change of each ratio
             int change = 0;
-            for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]);
+            for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]); //TODO must scale with frame size
+            printf("Splice Change Value = %i!\n",change);
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
-            for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
             if (change > SPLICE_THRESH) {
                 //send ratio to servers
                 printf("Change threshold exceeded, sending new splice ratios\n");
