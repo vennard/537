@@ -76,7 +76,6 @@ bool spliceRatio(int rxLen) {
         gettimeofday(&tvSplice, NULL);
         started = true;
         return true;
-        //checkTime = timeDiff(&tvStart, &tvCheck);
     } else {
         gettimeofday(&tvCheck, NULL);
         checkTime = timeDiff(&tvSplice, &tvCheck); 
@@ -84,13 +83,13 @@ bool spliceRatio(int rxLen) {
     if (checkTime > SPLICE_DELAY) {
         gettimeofday(&tvSplice, NULL);
         float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
-        printf("Total = %f\n",total);
         float srcRatio[4];
         for (i = 0;i < 4;i++) srcRatio[i] = (srcpkts[i] / total);
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
         for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
         //DEBUG
+        printf("Total # packets received = %f\n",total);
         printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
         for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
         //DEBUG
