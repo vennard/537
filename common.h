@@ -38,7 +38,6 @@
 #define SPLICE_THRESH 10  //TODO threshold of change needed to send update
 #define SPLICE_GAP 100 // + last received packet syncs splice changeover at servers
 
-
 /*******************
  * General defines
  *******************/
@@ -60,14 +59,6 @@ typedef struct pkthdr_common {
     uint32_t seq; // sequence number
     /* followed by payload */
 } pkthdr_common;
-
-/*Packet header of TYPE_REQ packet*/
-typedef struct pkthdr_req {
-    pkthdr_common common_hdr;
-    /* payload starts here */
-    int8_t filename[MAX_FILENAME_LEN]; // name of the requested file    
-} pkthdr_req;
-
 
 /*******************
  * Packet Defines
@@ -92,14 +83,11 @@ typedef struct pkthdr_req {
 #define ID_SERVER3 3
 #define ID_SERVER4 4
 
-/* Change: Client has to communicate with all the servers, ID_SERVER define does not make sense */
-
-/* Packet lengths (without headers) */
+/* Packet lengths */
 #define PKTLEN_MSG 128 // fixed size for easy usage, can be changed in the future
-#define PKTLEN_DATA 1024
 #define HDRLEN (sizeof(pkthdr_common)) // header size
-
-
+#define DATALEN 1024 // data size
+#define PKTLEN_DATA (HDRLEN+DATALEN) // data packet size
 
 /*******************
  * Rx/Tx defines
