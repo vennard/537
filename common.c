@@ -162,7 +162,8 @@ bool fillpktSplice(
     spl->src = ID_CLIENT;
     spl->dst = dst;
     spl->type = TYPE_SPLICE;
-    spl->sseq = 15;
+    spl->sseq = sseq;
+    spl->ratios = ratios
 
     return true;
 }
