@@ -165,11 +165,9 @@ bool fillpktSplice(
     spl->common_hdr.seq = 9;
 
     uint32_t t = 14;
-    char *ptr = &t;
-    memcpy(spl->sseq, ptr, sizeof(t));
-    printf("Filled sseq with %i\n",spl->sseq);
+    unsigned char* ptr = (void*) &t;
 
-    memcpy(spl->ratios, ratios, sizeof(ratios));
+    memcpy(buf + sizeof(pkthdr_common), ptr, sizeof(t));
 
     return true;
 }

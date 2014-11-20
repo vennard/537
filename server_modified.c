@@ -76,6 +76,7 @@ bool receiveSplice(int soc, struct sockaddr_in* client) {
         printf("    dst: %i\n",splIn->common_hdr.dst);
         printf("    type: %i\n",splIn->common_hdr.type);
         printf("    seq: %i\n",splIn->common_hdr.seq);
+        printf("    sseq: %i\n",splIn->sseq);
         printf("finished splice check\n");
 
     return true;
