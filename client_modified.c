@@ -326,8 +326,6 @@ int main(int argc, char *argv[]) {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
 
-	exit(0); //DEBUG STOP TODO
-
 	 // receive movie
     if (receiveMovie(soc, &filename) == false) {
         printf("Error: Error during the file streaming, program stopped\n");
