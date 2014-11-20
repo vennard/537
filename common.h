@@ -61,13 +61,6 @@ typedef struct pkthdr_common {
     /* followed by payload */
 } pkthdr_common;
 
-/*Packet header of TYPE_REQ packet*/
-typedef struct pkthdr_req {
-    pkthdr_common common_hdr;
-    /* payload starts here */
-    int8_t filename[MAX_FILENAME_LEN]; // name of the requested file    
-} pkthdr_req;
-
 /*packet header of TYPE_SPLICE packet*/
 typedef struct pkthdr_spl {
     uint8_t src; // source
