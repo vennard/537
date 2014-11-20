@@ -88,44 +88,44 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     unsigned int clientSize = sizeof (*client);
     unsigned int errCount = 0;
 
-    while (errCount++ < MAX_ERR_COUNT) {
-        memset(pktIn, 0, PKTLEN_MSG);
-        int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
-        rxRes = checkRxStatus(rxRes, pktIn, serverName);
+    //non blocking read for start request
+    memset(pktIn, 0, PKTLEN_MSG);
+    int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
+    if (rxRes < 0) return false; //return if no packet to read
 
-        if (rxRes == RX_TERMINATED) return false;
-        if (rxRes != RX_OK) continue;
+    rxRes = checkRxStatus(rxRes, pktIn, serverName);
+    if (rxRes == RX_TERMINATED) return false;
+    if (rxRes != RX_OK) return false;
+    if (hdrIn->type != TYPE_REQ) return false;
 
-        if (hdrIn->type != TYPE_REQ) {
-            printf("Warning: Received an unexpected packet type, ignoring it\n");
-            continue;
-        }
-
-        *filename = (char*) payloadIn;
-        int typeOut;
-        if (lookupFile(*filename) == true) {
-            typeOut = TYPE_REQACK;
-        } else {
-            typeOut = TYPE_REQNAK;
-            printf("Error: Requested file does not exist\n");
-        }
-
-        if (fillpkt(pktOut, serverName, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
-            return false;
-        }
-        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
-        dprintPkt(pktOut, PKTLEN_MSG, true);
-
-        if (typeOut == TYPE_REQACK) {
-            return true;
-        } else {
-            return false;
-        }
+    //send response
+    *filename = (char*) payloadIn;
+    int typeOut;
+    if (lookupFile(*filename) == true) {
+        typeOut = TYPE_REQACK;
+    } else {
+        typeOut = TYPE_REQNAK;
+        printf("Error: Requested file does not exist\n");
     }
-
-    printf("Error: Received maximum number of subsequent bad packets\n");
-    return false;
+    if (fillpkt(pktOut, serverName, ID_CLIENT, typeOut, 0, NULL, 0) == false) {
+        return false;
+    }
+    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
+    dprintPkt(pktOut, PKTLEN_MSG, true);
+    if (typeOut == TYPE_REQACK) {
+        return true;
+    } else {
+        return false;
+    }
 }
+
+//return values:
+//0 - success
+//1 - finished streaming
+//2 - streaming error
+//int streamFile(int soc, struct sockaddr_in* client, char* filename) {
+//    return 2;
+//}
 
 bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     bool isTest = false;
@@ -216,15 +216,15 @@ int main(int argc, char *argv[]) {
     while (errCount < MAX_ERR_COUNT) {
         if (!start) {
             if (receiveReq(soc, &client, &filename) == false) {
-                printf("Error: Invalid client request, retrying\n");
                 continue;
             } else {
                 printf("A request from %s received, requested file: '%s'\n",inet_ntoa(client.sin_addr), filename);
-                printf("Streaming the requested file with initial splice number = %i...\n",spliceRatios[serverName-1]);
+                printf("Streaming the requested file with initial splice number = %i\n",spliceRatios[serverName-1]);
                 start = true;
+                exit(0); //TODO DEBUG EXIT
             }
         } else {
-            //stream file and check for new splice ratios from client
+            //stream file 
             int streamCode = streamFile(soc, &client, filename);
             switch (streamCode) {
                 case 0: //pkt send success
@@ -242,13 +242,11 @@ int main(int argc, char *argv[]) {
                     safeExit(soc,1);
                     break;
             } 
+            //check for new splice ratio
             if (receiveSplice(soc, &client) == false) {
                 printf("Error: Invalid splice ratio request, continuing\n");
                 continue;
-            } else {
-                printf("Received new splice ratio\n");
-            }
-
+            } 
         }
     }
     printf("Server exceeded error limit of %i, exiting\n",MAX_ERR_COUNT);
