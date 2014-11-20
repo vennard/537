@@ -71,9 +71,11 @@ typedef struct pkthdr_req {
 
 /*packet header of TYPE_SPLICE packet*/
 typedef struct pkthdr_spl {
-    pkthdr_common common_hdr;
-    uint8_t ratios[4]; //holds new splice ratios
+    uint8_t src; // source
+    uint8_t dst; // destination
+    uint8_t type; // packet type
     uint32_t sseq; //holds sync seq number for new splice ratios
+    uint8_t ratios[4]; //holds new splice ratios
 } pkthdr_spl;
 
 

@@ -159,15 +159,10 @@ bool fillpktSplice(
 
     memset(buf, 0, PKTLEN_MSG);
     pkthdr_spl* spl = (pkthdr_spl*) buf;
-    spl->common_hdr.src = ID_CLIENT;
-    spl->common_hdr.dst = dst;
-    spl->common_hdr.type = TYPE_SPLICE;
-    spl->common_hdr.seq = 9;
-
-    uint32_t t = 14;
-    unsigned char* ptr = (void*) &t;
-
-    memcpy(buf + sizeof(pkthdr_common), ptr, sizeof(t));
+    spl->src = ID_CLIENT;
+    spl->dst = dst;
+    spl->type = TYPE_SPLICE;
+    spl->sseq = 15;
 
     return true;
 }
