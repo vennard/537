@@ -156,7 +156,6 @@ bool fillpktSplice(
         dprintf("Error: Packet could not be created\n");
         return false;
     }
-
     memset(buf, 0, PKTLEN_MSG);
     pkthdr_spl* spl = (pkthdr_spl*) buf;
     spl->src = ID_CLIENT;
@@ -167,7 +166,6 @@ bool fillpktSplice(
     spl->ratios[1] = ratios[1];
     spl->ratios[2] = ratios[2];
     spl->ratios[3] = ratios[3];
-
     return true;
 }
 

@@ -184,50 +184,75 @@ void checkArgs(int argc, char *argv[]) {
         printf("Server %i selected.\n",serverName);
     }
 }
+
+void safeExit(int soc, int exitCode){
+    printf("server shutting down\n");
+    close(soc);
+    exit(exitCode);
+}
+
 int main(int argc, char *argv[]) {
     checkArgs(argc, argv);
 
-    int soc = udpInit(UDP_PORT, 0);
+    //int soc = udpInit(UDP_PORT, 0);
+    int soc = udpInit(UDP_PORT, 1); //create socket with timeout
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, server stopped\n");
         exit(1);
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
-    /*
-    printf("SpliceRatios:\n");
+
     int i;
-    for (i = 0;i < 4;i++) printf("Server%i - %i\n", i, spliceRatios[i]);
-    */
+    printf("Initial Splice Ratios:");
+    for (i = 0;i < 4;i++) printf(" %i ", spliceRatios[i]);
+    printf("\n");
 
     struct sockaddr_in client;
     char* filename;
-    while (1) {
-        printf("Waiting for a request from client\n");
-        //TODO below testing
-        if (receiveSplice(soc, &client) == false) {
-            printf("Error: Invalid splice ratio request, server stopped\n");
-            continue;
+    bool start = false;
+    int errCount = 0;
+    printf("Waiting for a request from client\n");
+    while (errCount < MAX_ERR_COUNT) {
+        if (!start) {
+            if (receiveReq(soc, &client, &filename) == false) {
+                printf("Error: Invalid client request, retrying\n");
+                continue;
+            } else {
+                printf("A request from %s received, requested file: '%s'\n",inet_ntoa(client.sin_addr), filename);
+                printf("Streaming the requested file with initial splice number = %i...\n",spliceRatios[serverName-1]);
+                start = true;
+            }
         } else {
-            printf("Got splice ratio!\n");
-        }
-        if (receiveReq(soc, &client, &filename) == false) {
-            printf("Error: Invalid client request, server stopped\n");
-            continue;
-        } else {
-            printf("A request from %s received, requested file: '%s'\n",inet_ntoa(client.sin_addr), filename);
-            printf("Streaming the requested file with initial splice number = %i...\n",spliceRatios[serverName-1]);
-        }
+            //stream file and check for new splice ratios from client
+            int streamCode = streamFile(soc, &client, filename);
+            switch (streamCode) {
+                case 0: //pkt send success
+                    break;
+                case 1: //streaming done
+                    printf("File successfully broadcasted\n");
+                    safeExit(soc,0);
+                    break;
+                case 2: //error with streaming
+                    printf("Error with streaming service, continuing\n");
+                    errCount++;
+                    continue;
+                default: 
+                    printf("Unknown streaming error occured, exiting\n");
+                    safeExit(soc,1);
+                    break;
+            } 
+            if (receiveSplice(soc, &client) == false) {
+                printf("Error: Invalid splice ratio request, continuing\n");
+                continue;
+            } else {
+                printf("Received new splice ratio\n");
+            }
 
-        if (streamFile(soc, &client, filename) == false) {
-            printf("Error: Error during the file streaming, server stopped\n");
-            continue;
-        } else {
-            printf("File successfully broadcasted\n");
         }
     }
-
-    close(soc);
+    printf("Server exceeded error limit of %i, exiting\n",MAX_ERR_COUNT);
+    safeExit(soc,1);
     return 0;
 }
 

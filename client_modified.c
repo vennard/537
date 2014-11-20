@@ -310,9 +310,8 @@ int main(int argc, char *argv[]) {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
 
-    printf("Entering splice\n");
-    if (spliceTx(true)) printf("Splice success!");
-	exit(0); //DEBUG STOP TODO
+   // printf("Entering splice\n");
+    //if (spliceTx(true)) printf("Splice success!");
 
 	 // start transmission of file
     printf("Requesting file '%s' from servers with the following addresses\n", filename);
@@ -326,6 +325,8 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
+
+	exit(0); //DEBUG STOP TODO
 
 	 // receive movie
     if (receiveMovie(soc, &filename) == false) {
