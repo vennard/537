@@ -58,6 +58,32 @@ bool lookupFile(char* file) {
     return false;
 }
 
+bool receiveSplice(int soc, struct sockaddr_in* client) {
+    unsigned int clientSize = sizeof (*client);
+    pkthdr_spl* splIn = (pkthdr_spl*) pktIn;
+    int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
+        rxRes = checkRxStatus(rxRes, pktIn, serverName);
+
+        if (rxRes == RX_TERMINATED) return false;
+        if (rxRes != RX_OK) return false;
+
+        if (splIn->type != TYPE_SPLICE) {
+            printf("Warning: DID NOT GET SPLICE!\n");
+            return false;
+        }
+        printf("Splice Comm Info:\n");
+        printf("    src: %i\n",splIn->src);
+        printf("    dst: %i\n",splIn->dst);
+        printf("    type: %i\n",splIn->type);
+        printf("    sseq: %i\n",splIn->sseq);
+        printf("    ratios: \n");
+        int i;
+        for (i = 0;i < 4;i++) printf(" %i-%i \n",i,splIn->ratios[i]);
+        printf("finished splice check\n");
+
+    return true;
+}
+
 bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     unsigned int clientSize = sizeof (*client);
     unsigned int errCount = 0;
@@ -69,7 +95,6 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
 
         if (rxRes == RX_TERMINATED) return false;
         if (rxRes != RX_OK) continue;
-
 
         if (hdrIn->type != TYPE_REQ) {
             printf("Warning: Received an unexpected packet type, ignoring it\n");
@@ -169,21 +194,29 @@ int main(int argc, char *argv[]) {
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
+    /*
     printf("SpliceRatios:\n");
     int i;
     for (i = 0;i < 4;i++) printf("Server%i - %i\n", i, spliceRatios[i]);
+    */
 
     struct sockaddr_in client;
     char* filename;
     while (1) {
         printf("Waiting for a request from client\n");
+        //TODO below testing
+        if (receiveSplice(soc, &client) == false) {
+            printf("Error: Invalid splice ratio request, server stopped\n");
+            continue;
+        } else {
+            printf("Got splice ratio!\n");
+        }
         if (receiveReq(soc, &client, &filename) == false) {
             printf("Error: Invalid client request, server stopped\n");
             continue;
         } else {
             printf("A request from %s received, requested file: '%s'\n",inet_ntoa(client.sin_addr), filename);
             printf("Streaming the requested file with initial splice number = %i...\n",spliceRatios[serverName-1]);
-            exit(0); //DEBUG STOP TODO
         }
 
         if (streamFile(soc, &client, filename) == false) {

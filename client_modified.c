@@ -18,26 +18,41 @@ static unsigned char pktIn[PKTLEN_DATA] = {0};
 static unsigned char pktOut[PKTLEN_MSG] = {0};
 static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
+static int sock;
+static struct sockaddr_in server[4];
 
 // data rate storage
-static int srcpkts[4] = {0};
-static float srcRatio[4] = {0};
-static int sendRatio[4] = {0};
+static float srcpkts[4] = {0};
+static uint8_t sendRatio[4] = {0,0,0,0};
 static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
 static char *saddr[4]; //server ip addresses
 bool started = false;
+bool startedSplice = false;
 bool ackdNewRatios = true;
 static bool ackdRatio[4] = {false}; //all true if got ack for each new splice ratio
+static int lastPkt = 0;
 
-bool sendRatios(){
-    //fillpkt(pkt, ID_CLIENT, 1, TYPE_SPLICE, 0, (unsigned char*) srcRatio[i], sizeof(srcRatio[i]))
-    return true;
-}
 
-bool spliceRatio(int rxLen) {
-    int checkTime, i;
+bool spliceTx(bool send) {
+    uint8_t i, j;
+    if (send) { 
+        //calculate splice ratio start frame
+        uint32_t seqGap = lastPkt + SPLICE_GAP;
+        unsigned char sPkt[4][PKTLEN_MSG];
+        for (i = 0;i < 4;i++) {
+           if (fillpktSplice(sPkt[i], (i+1), seqGap, sendRatio) == false) return false; 
+        }
+        //send new splice ratios
+        for (i = 0;i < 4;i++) {
+            if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
+            sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+        }
+        printf("Sent splice ratios!!!\n");
+        return true;
 
+
+/*
     //check for acks from new splicing ratios first
     if ((!ackdNewRatios) && (hdrIn->type == TYPE_SPLICE_ACK)) {
         ackdRatio[hdrIn->src-1] = true;
@@ -56,11 +71,22 @@ bool spliceRatio(int rxLen) {
         if (checkTime > (SPLICE_DELAY / 4)) {
             //resend ratios and reset splice delay 
             //sendRatios();
+            //TODO add support for completely congested lines
             gettimeofday(&tvSplice, NULL);
         }
     }
+    */
 
-    //check that packet is of valid type before recording
+
+    } else { //check for splice acknowledges
+    }
+    return false;
+}
+
+bool spliceRatio(int rxLen) {
+    int checkTime, i;
+
+        //check that packet is of valid type before recording
     if (hdrIn->type != TYPE_DATA) return false;
 
     //record where packet came from
@@ -69,38 +95,46 @@ bool spliceRatio(int rxLen) {
     srcpkts[src - 1]++;
 
     //timer trigger for splice ratio calculations
-    gettimeofday(&tvCheck, NULL);
     if (!started) {
-        checkTime = timeDiff(&tvStart, &tvCheck);
+        gettimeofday(&tvSplice, NULL);
+        started = true;
+        return true;
     } else {
+        gettimeofday(&tvCheck, NULL);
         checkTime = timeDiff(&tvSplice, &tvCheck); 
     }
     if (checkTime > SPLICE_DELAY) {
         gettimeofday(&tvSplice, NULL);
-        started = true;
-        int total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
-        for (i = 0;i < 4;i++) srcRatio[i] = srcpkts[i] / total;
+        float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
+        float srcRatio[4];
+        for (i = 0;i < 4;i++) srcRatio[i] = (srcpkts[i] / total);
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
+        for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
+        //DEBUG
+        printf("Total # packets received = %f\n",total);
+        printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
+        for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
+        //DEBUG
         if (check != 1) {
             printf("Error with splice ratio check (= %.6f)\n",check);
             return false;
         }
         //multiply ratio * SPLICE_FRAME to find final ratio
-        for (i = 0;i < 4;i++) sendRatio[i] = (int) srcRatio[i] * SPLICE_FRAME;
-        if ((oldRatio[0] == 0) && (oldRatio[1] == 0) && (oldRatio[2] == 0) && (oldRatio[3] == 0)) {
+        for (i = 0;i < 4;i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
+        if (!startedSplice) {
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
+            startedSplice = true;
         } else {
             //calculate total of absolute value of change of each ratio
             int change = 0;
-            for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]);
+            for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]); //TODO must scale with frame size
+            printf("Splice Change Value = %i!\n",change);
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
             if (change > SPLICE_THRESH) {
                 //send ratio to servers
                 printf("Change threshold exceeded, sending new splice ratios\n");
-                //sendRatios();
-                ackdNewRatios = false;
-                for (i = 0;i < 4;i++) ackdRatio[i] = false;
+                if (!spliceTx(true)) return false;
             }
         }
     }
@@ -127,7 +161,6 @@ bool plotGraph(void) {
 
 bool reqFile(int soc, char* filename) {
     struct sockaddr_in sender;
-    struct sockaddr_in server[4];
     unsigned char pkt[4][PKTLEN_MSG];
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
@@ -225,6 +258,9 @@ bool receiveMovie(int soc, char** filename) {
             continue;
         }
 
+        //store last sequence number received
+        lastPkt = hdrIn->seq;
+
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
@@ -266,12 +302,17 @@ int main(int argc, char *argv[]) {
 
 	 // initialize UDP socket
     int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
+    sock = soc;
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
+
+    printf("Entering splice\n");
+    if (spliceTx(true)) printf("Splice success!");
+	exit(0); //DEBUG STOP TODO
 
 	 // start transmission of file
     printf("Requesting file '%s' from servers with the following addresses\n", filename);
@@ -285,7 +326,6 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Request for '%s' successful, receiving the data\n", filename);
     }
-	exit(0); //DEBUG STOP TODO
 
 	 // receive movie
     if (receiveMovie(soc, &filename) == false) {
@@ -295,6 +335,8 @@ int main(int argc, char *argv[]) {
     } else {
         printf("File successfully transfered, local copy: client_%s\n", filename);
     }
+
+	exit(0); //DEBUG STOP TODO
 
     // clean up resources and plot 
     close(soc);

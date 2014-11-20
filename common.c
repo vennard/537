@@ -65,7 +65,7 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
     return soc;
 }
 
-//TODO Change ERROR codes to be negative numbers - otherwise conflicts with node names
+//TODO change error codes away from server names
 int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
  	 if ((pkt == NULL) || (expDst < 1)) {
         printf("Warning: Unknown Rx error occurred\n");
@@ -147,6 +147,31 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
         return (secDiff + usecDiff);
     }
 }
+
+bool fillpktSplice( 
+        unsigned char* buf, uint8_t dst, 
+        uint32_t sseq, uint8_t ratios[4]) {
+
+    if (buf == NULL) {
+        dprintf("Error: Packet could not be created\n");
+        return false;
+    }
+
+    memset(buf, 0, PKTLEN_MSG);
+    pkthdr_spl* spl = (pkthdr_spl*) buf;
+    spl->src = ID_CLIENT;
+    spl->dst = dst;
+    spl->type = TYPE_SPLICE;
+    spl->sseq = sseq;
+    spl->ratios[0] = ratios[0];
+    spl->ratios[1] = ratios[1];
+    spl->ratios[2] = ratios[2];
+    spl->ratios[3] = ratios[3];
+
+    return true;
+}
+
+
 
 bool fillpkt(
         unsigned char* buf,

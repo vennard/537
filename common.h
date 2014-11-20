@@ -7,6 +7,7 @@
 #ifndef COMMON_H
 #define	COMMON_H
 
+#define DEBUG 0
 
 /*******************
  * Includes 
@@ -33,9 +34,9 @@
 /*******************
  * Critical Variables
  *******************/
-#define SPLICE_DELAY 200 //time between calculating splice ratios
-#define SPLICE_FRAME 10  //controls resolution of splice ratio from servers
-#define SPLICE_THRESH 10  //TODO threshold of change needed to send update
+#define SPLICE_DELAY 800 //time between calculating splice ratios
+#define SPLICE_FRAME 100  //controls resolution of splice ratio from servers
+#define SPLICE_THRESH 1  //TODO threshold of change needed to send update
 #define SPLICE_GAP 100 // + last received packet syncs splice changeover at servers
 
 /*******************
@@ -59,6 +60,23 @@ typedef struct pkthdr_common {
     uint32_t seq; // sequence number
     /* followed by payload */
 } pkthdr_common;
+
+/*Packet header of TYPE_REQ packet*/
+typedef struct pkthdr_req {
+    pkthdr_common common_hdr;
+    /* payload starts here */
+    int8_t filename[MAX_FILENAME_LEN]; // name of the requested file    
+} pkthdr_req;
+
+/*packet header of TYPE_SPLICE packet*/
+typedef struct pkthdr_spl {
+    uint8_t src; // source
+    uint8_t dst; // destination
+    uint8_t type; // packet type
+    uint32_t sseq; //holds sync seq number for new splice ratios
+    uint8_t ratios[4]; //holds new splice ratios
+} pkthdr_spl;
+
 
 /*******************
  * Packet Defines
