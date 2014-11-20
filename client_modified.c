@@ -23,7 +23,7 @@ static struct sockaddr_in server[4];
 
 // data rate storage
 static float srcpkts[4] = {0};
-static int sendRatio[4] = {0,0,0,0};
+static uint8_t sendRatio[4] = {0,0,0,0};
 static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
 static char *saddr[4]; //server ip addresses
@@ -38,7 +38,7 @@ bool spliceTx(bool send) {
     uint8_t i, j;
     if (send) { 
         //calculate splice ratio start frame
-        int seqGap = lastPkt + SPLICE_GAP;
+        uint32_t seqGap = lastPkt + SPLICE_GAP;
         unsigned char sPkt[4][PKTLEN_MSG];
         for (i = 0;i < 4;i++) {
            if (fillpktSplice(sPkt[i], (i+1), seqGap, sendRatio) == false) return false; 
