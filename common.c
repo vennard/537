@@ -163,7 +163,10 @@ bool fillpktSplice(
     spl->dst = dst;
     spl->type = TYPE_SPLICE;
     spl->sseq = sseq;
-    spl->ratios = ratios
+    spl->ratios[0] = ratios[0];
+    spl->ratios[1] = ratios[1];
+    spl->ratios[2] = ratios[2];
+    spl->ratios[3] = ratios[3];
 
     return true;
 }
