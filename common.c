@@ -150,7 +150,7 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
 
 bool fillpktSplice( 
         unsigned char* buf, uint8_t dst, 
-        uint32_t sseq, uint32_t ratios[4]) {
+        uint32_t sseq, uint8_t ratios[4]) {
 
     if (buf == NULL) {
         dprintf("Error: Packet could not be created\n");
@@ -163,7 +163,12 @@ bool fillpktSplice(
     spl->common_hdr.dst = dst;
     spl->common_hdr.type = TYPE_SPLICE;
     spl->common_hdr.seq = 9;
-    spl->sseq = sseq;
+
+    uint32_t t = 14;
+    char *ptr = &t;
+    memcpy(spl->sseq, ptr, sizeof(t));
+    printf("Filled sseq with %i\n",spl->sseq);
+
     memcpy(spl->ratios, ratios, sizeof(ratios));
 
     return true;
