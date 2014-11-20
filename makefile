@@ -11,10 +11,10 @@ debug: CFLAGS += -DDEBUG=1 -g
 debug: server client 
 
 server: server.c
-	$(CC) $(CFLAGS) server.c common.c common.h -o server
+	$(CC) $(CFLAGS) server.c common.c common.h packet_buffer.c packet_buffer.h -o server
 
 client: client.c
-	$(CC) $(CFLAGS) client.c common.c common.h -o client 
+	$(CC) $(CFLAGS) client.c common.c common.h packet_buffer.c packet_buffer.h -o client 
 
 clean:
 	rm -f server client repeater graph.png graph_datafile client_pic.bmp client_random
