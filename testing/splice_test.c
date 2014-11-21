@@ -5,13 +5,41 @@
 #include <stdbool.h>
 
 #define SF 10
-#define SERVER 3
 
+int server = 2;
 static float ratio[4] = {.25,.25,.25,.25};
 static int r[4];
-static int b[4];
-static bool empty = false;
-static int loop = 2; //# of time test loops
+static int b[4][4];
+static bool empty[4];
+static int loop = 8; //# of time test loops
+static int seq[4] = {0,0,0,0};
+static int ts = 0;
+static int sseq = 13;
+
+void checkSplice(int ss) {
+        
+}
+
+int getSplice(int ss) {
+    int i;
+    empty[ss] = true;
+    for (i = 0;i < 4;i++) if (b[ss][i] > 0) empty[ss] = false; 
+    //if bucket empty, reset
+    if (empty[ss]) {
+        for (i = 0;i < 4;i++) b[ss][i] = r[i];
+        empty[ss] = false;
+    }
+    //start calc
+    int out = -1;
+    for (i = 0;i < 4;i++) {
+        if (b[ss][i] > 0) {
+            b[ss][i]--;
+            seq[ss]++;
+            if (i == (ss)) out = seq[ss]-1;
+        } 
+    }
+    return out;
+}
 
 int main(int argc, char *argv[]) {
     int i,frame,k;
@@ -20,7 +48,7 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s [<ratio1> <ratio2> <ratio3> <ratio4>]\n",argv[0]);
         exit(1);
     } else if (argc == 1){
-        printf("Using default ratios of .25\n");
+        printf("Using default ratios of .25 with server 0\n");
         for (i = 0;i < 4;i++) r[i] = (int) (ratio[i] * SF);
     } else {
         //set ratios
@@ -35,60 +63,18 @@ int main(int argc, char *argv[]) {
         printf("\n");
     }
 
-
-
     printf("Ratios: ");
     for (i = 0;i < 4;i++) printf(" %i ",r[i]);
     printf("\n");
 
-    printf("server %i\n",SERVER);
-    printf("---------------------\n");
-
-    frame = 0;
+    printf("  0    1    2    3\n");
+    printf("---------------\n");
+    int a[4];
     while (j < loop) {
-        empty = false;
-        for (i = 0;i < 4;i++) b[i] = r[i]; //reset bucket
-        k = 0;
-        while (!empty) {
-            int sw = k % 4;
-            //printf("entering switch with value %i\n",sw);
-            //for (i = 0;i < 4;i++) printf("b%i = %i\n",i,b[i]);
-            switch (sw) {
-                case 0:
-                    if (b[sw] > 0) {
-                        b[sw]--;
-                        if (sw == SERVER-1) printf("sent frame %i\n",frame);
-                        frame++;
-                    }
-                    break;
-                case 1:
-                    if (b[sw] > 0) {
-                        b[sw]--;
-                        if (sw == SERVER-1) printf("sent frame %i\n",frame);
-                        frame++;
-                    }
-                        break;
-                case 2:
-                    if (b[sw] > 0) {
-                        b[sw]--;
-                        if (sw == SERVER-1) printf("sent frame %i\n",frame);
-                        frame++;
-                    }
-                        break;
-                case 3:
-                    if (b[sw] > 0) {
-                        b[sw]--;
-                        if (sw == SERVER-1) printf("sent frame %i\n",frame);
-                        frame++;
-                    }
-                        break;
-            }
-            k++;
-            empty = true;
-            for (i = 0;i < 4;i++) if (b[i] > 0) empty = false; 
-            //for (i = 0;i < 4;i++) printf("b%i = %i\n",i,b[i]);
-        }
+        for (i = 0;i < 4;i++) a[i] = getSplice(i);
+        printf("  %i   %i   %i   %i\n",a[0],a[1],a[2],a[3]);
         j++;
     }
 
+    exit(0);
 }

@@ -54,9 +54,8 @@ bool spliceTx() {
     return true;
 }
 
-
-//TODO add support for completely congested lines (ie no ack available)
 void spliceAckCheck(int rxLen){
+    int i;
     //check splice timeout
     gettimeofday(&tvCheck, NULL);
     int check = timeDiff(&tvSpliceAck, &tvCheck);
@@ -76,8 +75,12 @@ void spliceAckCheck(int rxLen){
             ackdRatio[src-1] = true;
         }
     }
+    //exclude extremely congested lines from needing ack
+    int tthresh = (SPLICE_FRAME / SPLICE_IGNORE_THRESH);
+    printf("threshold to ignore is %i\n",tthresh);
+    for (i = 0;i < 4;i++) if (sendRatio[i] <= tthresh) ackdRatio[i] = true;
+
     //check for all four acks
-    int i;
     ackdNewRatios = true;
     for (i = 0;i < 4;i++) if (!ackdRatio[i]) ackdNewRatios = false;
     if (ackdNewRatios) printf("Splice ack success! Got all 4 acks\n");

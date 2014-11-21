@@ -28,20 +28,29 @@ static unsigned char* payloadOut = pktOut + HDRLEN;
 static int serverName; //holds name of server (1-4)
 static int spliceRatios[4] = {(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME)};
 static int nSpliceRatios[4] = {0,0,0,0}; //new splice ratios
-static int sBucket[4] = {0,0,0,0};
-static int spliceSeqSwitch = 0; //frame to switch to new ratios on
+static int b[4] = {0,0,0,0};
+static int sseq = 0; //frame to switch to new ratios on
+static bool waitSpliceChange = false;
 static bool emptyBucket = true;
-static int syncseq = 0; //overall sequence number to keep track of splice
+static int seq = 0; //overall sequence number to keep track of splice
 
 int getSplice() {
     int i;
-    int j = 0;
+    emptyBucket = true;
+    for (i = 0;i < 4;i++) if (b[i] > 0) emptyBucket = false;
     if (emptyBucket) {
-       for (i = 0;i < 4;i++) sBucket[i] = spliceRatios[i];
-       emptyBucket = false;
+        for (i = 0;i < 4;i++) b[i] = spliceRatios[i];
+        emptyBucket = false;
     }
-    //TODO needs to be finished
-    return 0;
+    int out = -1;
+    for (i = 0;i < 4;i++) {
+        if (b[i] > 0) {
+            b[i]--;
+            seq++;
+            if (i == serverName) out = seq-1;
+        }
+    }
+    return out;
 }
 
 bool lookupFile(char* file) {
@@ -88,6 +97,16 @@ bool receiveSplice(int soc, struct sockaddr_in* client) {
     printf("Got new splice ratios: "); 
     for (i = 0;i < 4;i++) printf(" %i ",splIn->ratios[i]);
     printf(" with sseq = %i\n", splIn->sseq);
+
+    for (i = 0;i < 4;i++) nSpliceRatios[i] = splIn->ratios[i];
+    sseq = splIn->sseq;
+    waitSpliceChange = true;
+
+    //check sequence change number
+    if (sseq <= seq) {
+        printf("Error: Got invalid sseq number!\n");
+        return false;
+    }
 
     //send splice acknowledge
     if (!fillpkt(pktOut, serverName, ID_CLIENT, TYPE_SPLICE_ACK, 0, NULL, 0)) {
@@ -138,18 +157,25 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
 //1 - finished streaming
 //2 - streaming error
 int stream(int soc, struct sockaddr_in* client, char* filename) {
-    //TODO including splicing ratios
-    if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, syncseq, NULL, 0) == false) {
+    int i;
+    //check splice ratio change, then get new seq
+    if ((seq >= sseq) && (waitSpliceChange)) {
+        printf("Switching splice ratios\n");
+        for (i = 0;i < 4;i++) spliceRatios[i] = nSpliceRatios[i];
+        waitSpliceChange = false;
+    }
+    int tseq = getSplice();
+    printf("Sending %i\n",tseq);
+
+    if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, tseq, NULL, 0) == false) {
         return 2;
     }
 
     int res = sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof(*client));
     if (res == -1) {
-        printf("Warning: tx error occurred for SEQ=%u\n", syncseq);
+        printf("Warning: tx error occurred for SEQ=%u\n", tseq);
         return 2;
     }
-
-    syncseq++;
     usleep(TX_DELAY);
 
     //TODO add completed file transfer check
@@ -170,8 +196,6 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
     unsigned int readSize = PKTLEN_DATA - HDRLEN;
     unsigned int seq = 1;
     while (readSize == PKTLEN_DATA - HDRLEN) {        
-        //TODO get sequence number from splice ratio
-        //int sendseq = getSplice(seq); 
         if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
             return false;
         }
@@ -185,8 +209,6 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
 
         seq++;
         if ((isTest == true) && (seq == EMPTY_PKT_COUNT)) break;
-
-        //TODO check for new splice ratio from client & for splice update frame
 
         usleep(TX_DELAY);
     }
