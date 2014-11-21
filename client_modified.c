@@ -272,6 +272,8 @@ bool receiveMovie(int soc, char** filename) {
         //store last sequence number received
         lastPkt = hdrIn->seq;
 
+        printf(" %i ",lastPkt); //DEBUG
+
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
