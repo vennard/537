@@ -88,7 +88,7 @@ int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
 }
 
 int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
-    if ((pkt == NULL) || (expDst < 1)) {
+    if ((pkt == NULL) || (expDst < 0)) {
         printf("Warning: Unknown Rx error occurred\n");
         return RX_ERR;
     }

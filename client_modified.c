@@ -255,6 +255,7 @@ bool receiveMovie(int soc, char** filename) {
             printf("Error in spliceRatio function\n");
             continue;
         }
+        //TODO check for missing packets
 
         if (hdrIn->type == TYPE_FIN) {
             fclose(graphDataFile);
