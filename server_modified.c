@@ -67,6 +67,19 @@ bool lookupFile(char* file) {
     return false;
 }
 
+bool checkEnd(int soc, struct sockaddr_in* client) {
+    unsigned int clientSize = sizeof (*client);
+    int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
+    if (rxRes < 0) return false;
+
+    if (hdrIn->type == TYPE_FIN) {
+        printf("Got terminate signal from client - exiting!\n");
+        exit(0);
+    }
+
+    return true;
+}
+
 bool receiveSplice(int soc, struct sockaddr_in* client) {
     int i;
     unsigned int clientSize = sizeof (*client);
@@ -294,6 +307,8 @@ int main(int argc, char *argv[]) {
                     safeExit(soc,1);
                     break;
             } 
+            //check for terminate signal
+            checkEnd(soc, &client);
             //check for new splice ratio
             receiveSplice(soc, &client); 
         }

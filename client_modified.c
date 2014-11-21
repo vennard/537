@@ -37,7 +37,16 @@ static int lastPkt = 0;
 //signal handler to catch ctrl+c exit
 void sigintHandler(int sig){
     signal(SIGINT, sigintHandler);
-    printf("Exiting safely\n");
+    printf("\nShutting down streaming service...\n");
+
+    //send kill signal to servers
+    int i; 
+    for (i = 0;i < 4;i++) {
+        fillpkt(pktOut, ID_CLIENT, i, TYPE_FIN, 0, NULL, 0); 
+        initHostStruct(&server[i], saddr[i], UDP_PORT);
+        sendto(sock, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+    }
+    close(sock);
     exit(0);
 }
 
