@@ -25,68 +25,71 @@ static struct sockaddr_in server[4];
 static float srcpkts[4] = {0};
 static uint8_t sendRatio[4] = {0,0,0,0};
 static int oldRatio[4] = {0}; //holds old ratios to check threshold for change
-static struct timeval tvStart, tvRecv, tvCheck, tvSplice;
+static struct timeval tvStart, tvRecv, tvCheck, tvSplice, tvSpliceAck;
 static char *saddr[4]; //server ip addresses
 bool started = false;
 bool startedSplice = false;
 bool ackdNewRatios = true;
-static bool ackdRatio[4] = {false}; //all true if got ack for each new splice ratio
+static bool ackdRatio[4] = {false,false,false,false}; //all true if got ack for each new splice ratio
 static int lastPkt = 0;
 
 
-bool spliceTx(bool send) {
+bool spliceTx() {
     uint8_t i, j;
-    if (send) { 
-        //calculate splice ratio start frame
-        uint32_t seqGap = lastPkt + SPLICE_GAP;
-        unsigned char sPkt[4][PKTLEN_MSG];
-        for (i = 0;i < 4;i++) {
-           if (fillpktSplice(sPkt[i], (i+1), seqGap, sendRatio) == false) return false; 
-        }
-        //send new splice ratios
-        for (i = 0;i < 4;i++) {
-            if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-            sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
-        }
-        printf("Sent splice ratios!!!\n");
-        return true;
-
-
-/*
-    //check for acks from new splicing ratios first
-    if ((!ackdNewRatios) && (hdrIn->type == TYPE_SPLICE_ACK)) {
-        ackdRatio[hdrIn->src-1] = true;
-        return true;
-    } 
-
-    //TODO fail update if splice ratios not ackd before splice update frame
-    //resend splice ratios if not received valid acks in 1/4 SPLICE_DELAY
-    ackdNewRatios = true;
+    //calculate splice ratio start frame
+    uint32_t seqGap = lastPkt + SPLICE_GAP;
+    unsigned char sPkt[4][PKTLEN_MSG];
     for (i = 0;i < 4;i++) {
-        if (ackdRatio[i] == false) ackdNewRatios = false;
+       if (fillpktSplice(sPkt[i], (i+1), seqGap, sendRatio) == false) return false; 
     }
-    if (!ackdNewRatios) {
-        gettimeofday(&tvCheck, NULL);
-        checkTime = timeDiff(&tvSplice, &tvCheck);
-        if (checkTime > (SPLICE_DELAY / 4)) {
-            //resend ratios and reset splice delay 
-            //sendRatios();
-            //TODO add support for completely congested lines
-            gettimeofday(&tvSplice, NULL);
+    //send new splice ratios
+    for (i = 0;i < 4;i++) {
+        if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
+        sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+    }
+    printf("Sent splice ratios!!!\n");
+    ackdNewRatios = false;
+    for (i = 0;i < 4;i++) ackdRatio[i] = false;
+    gettimeofday(&tvSpliceAck, NULL);
+    return true;
+}
+
+
+//TODO add support for completely congested lines (ie no ack available)
+void spliceAckCheck(int rxLen){
+    //check splice timeout
+    gettimeofday(&tvCheck, NULL);
+    int check = timeDiff(&tvSpliceAck, &tvCheck);
+    if (check > (SPLICE_DELAY / 4)) {
+        printf("Warning: Splice ack timeout, resending ratios\n");
+        if (!spliceTx()) {
+            printf("Error: Failed to resend splice ratios\n");
         }
     }
-    */
-
-
-    } else { //check for splice acknowledges
+    //read splice ack
+    if (hdrIn->type == TYPE_SPLICE_ACK) {
+        int src = checkRxSrc(rxLen, pktIn, ID_CLIENT); 
+        printf("Got splice ack from server %i\n",src);
+        if ((src < 1)||(src > 4)) {
+            printf("Error: Splice ack contains invalid src\n");
+        } else {
+            ackdRatio[src] = true;
+        }
     }
-    return false;
+    //check for all four acks
+    int i;
+    ackdNewRatios = true;
+    for (i = 0;i < 4;i++) if (!ackdRatio[i]) ackdNewRatios = false;
+    if (ackdNewRatios) printf("Splice ack success! Got all 4 acks\n");
 }
 
 bool spliceRatio(int rxLen) {
     int checkTime, i;
 
-        //check that packet is of valid type before recording
+    //check for splice acks
+    if (!ackdNewRatios) spliceAckCheck(rxLen);
+
+    //check that packet is of valid type before recording
     if (hdrIn->type != TYPE_DATA) return false;
 
     //record where packet came from
@@ -134,7 +137,7 @@ bool spliceRatio(int rxLen) {
             if (change > SPLICE_THRESH) {
                 //send ratio to servers
                 printf("Change threshold exceeded, sending new splice ratios\n");
-                if (!spliceTx(true)) return false;
+                if (!spliceTx()) return false;
             }
         }
     }
@@ -252,7 +255,9 @@ bool receiveMovie(int soc, char** filename) {
             fclose(graphDataFile);
             fclose(streamedFile);
             return true;
-        } else if (hdrIn->type != TYPE_DATA) { //TODO make expection for ack from new splice ratio
+        } else if (hdrIn->type == TYPE_SPLICE_ACK) {
+            continue;
+        } else if (hdrIn->type != TYPE_DATA) { 
             printf("Warning: Received an unexpected packet type, ignoring it\n");
             errCount++;
             continue;
@@ -309,9 +314,6 @@ int main(int argc, char *argv[]) {
     } else {
         dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
-
-   // printf("Entering splice\n");
-    //if (spliceTx(true)) printf("Splice success!");
 
 	 // start transmission of file
     printf("Requesting file '%s' from servers with the following addresses\n", filename);

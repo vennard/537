@@ -72,16 +72,25 @@ bool receiveSplice(int soc, struct sockaddr_in* client) {
         printf("Warning: Read of incorrect type!\n");
         return false;
     }
-    printf("Splice Comm Info:\n");
-    printf("    src: %i\n",splIn->src);
-    printf("    dst: %i\n",splIn->dst);
-    printf("    type: %i\n",splIn->type);
-    printf("    sseq: %i\n",splIn->sseq);
-    printf("    ratios: \n");
-    int i;
-    for (i = 0;i < 4;i++) printf(" %i-%i \n",i,splIn->ratios[i]);
-    printf("finished splice check\n");
 
+    if (DEBUG) {
+        printf("Splice Comm Info:\n");
+        printf("    src: %i\n",splIn->src);
+        printf("    dst: %i\n",splIn->dst);
+        printf("    type: %i\n",splIn->type);
+        printf("    sseq: %i\n",splIn->sseq);
+        printf("    ratios: \n");
+        int i;
+        for (i = 0;i < 4;i++) printf(" %i-%i \n",i,splIn->ratios[i]);
+        printf("finished splice check\n");
+    }
+
+    //send splice acknowledge
+    if (!fillpkt(pktOut, serverName, ID_CLIENT, TYPE_SPLICE_ACK, 0, NULL, 0)) {
+        printf("Error: failed to construct splice ack msg\n");
+        return false;
+    } 
+    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client)); 
     return true;
 }
 
