@@ -68,7 +68,7 @@ void spliceAckCheck(int rxLen){
     //read splice ack
     if (hdrIn->type == TYPE_SPLICE_ACK) {
         int src = checkRxSrc(rxLen, pktIn, ID_CLIENT); 
-        printf("Got splice ack from server %i\n",src);
+        //printf("Got splice ack from server %i\n",src);
         if ((src < 1)||(src > 4)) {
             printf("Error: Splice ack contains invalid src\n");
         } else {
@@ -77,7 +77,6 @@ void spliceAckCheck(int rxLen){
     }
     //exclude extremely congested lines from needing ack
     int tthresh = (SPLICE_FRAME / SPLICE_IGNORE_THRESH);
-    printf("threshold to ignore is %i\n",tthresh);
     for (i = 0;i < 4;i++) if (sendRatio[i] <= tthresh) ackdRatio[i] = true;
 
     //check for all four acks
@@ -119,11 +118,11 @@ bool spliceRatio(int rxLen) {
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
         for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
-        //DEBUG
-        printf("Total # packets received = %f\n",total);
-        printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
-        for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
-        //DEBUG
+        if (DEBUG) {
+            printf("Total # packets received = %f\n",total);
+            printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
+            for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
+        }
         if (check != 1) {
             printf("Error with splice ratio check (= %.6f)\n",check);
             return false;
@@ -137,11 +136,10 @@ bool spliceRatio(int rxLen) {
             //calculate total of absolute value of change of each ratio
             int change = 0;
             for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]); //TODO must scale with frame size
-            printf("Splice Change Value = %i!\n",change);
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
             if (change >= SPLICE_THRESH) {
                 //send ratio to servers
-                printf("Change threshold exceeded, sending new splice ratios\n");
+                printf("Change threshold exceeded with change value %i, sending new splice ratios\n",change);
                 if (!spliceTx()) return false;
             }
         }
@@ -203,7 +201,7 @@ bool reqFile(int soc, char* filename) {
             }
             if (hdrIn->type == TYPE_REQACK) {
                 serverAck[hdrIn->src-1] = 1; 
-                printf("Got ack from server %i!\n",hdrIn->src);
+                //printf("Got ack from server %i!\n",hdrIn->src);
             } else if (hdrIn->type == TYPE_REQNAK) {
                 printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
                 return false;

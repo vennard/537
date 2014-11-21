@@ -165,6 +165,7 @@ int stream(int soc, struct sockaddr_in* client, char* filename) {
         waitSpliceChange = false;
     }
     int tseq = getSplice();
+    if (tseq == -1) return 0;
     printf("Sending %i\n",tseq);
 
     if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, tseq, NULL, 0) == false) {
