@@ -55,20 +55,19 @@ void sigintHandler(int sig){
 
 bool spliceTx() {
     uint8_t i, j;
-    //calculate splice ratio start frame
     uint32_t seqGap = lastPkt + SPLICE_GAP;
-    unsigned char sPkt[4][PKTLEN_MSG];
-    for (i = 0;i < 4;i++) {
-       if (fillpktSplice(sPkt[i], i, seqGap, sendRatio) == false) return false; 
-    }
-    //send new splice ratios
-    for (i = 0;i < 4;i++) {
-        if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-        sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
-    }
-    printf("Sent splice ratios!!!\n");
     ackdNewRatios = false;
     for (i = 0;i < 4;i++) ackdRatio[i] = false;
+
+    //double tap sending splice ratios - TODO see if necessary
+    for (j = 0;j < 2;j++) {
+        for (i = 0;i < 4;i++) {
+            if (fillpktSplice(pktOut, i, seqGap, sendRatio) == false) return false; 
+            if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
+            sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+        }
+    }
+    printf("Sent splice ratios!!!\n");
     gettimeofday(&tvSpliceAck, NULL);
     return true;
 }
@@ -79,7 +78,7 @@ void spliceAckCheck(int rxLen){
     //check splice timeout
     gettimeofday(&tvCheck, NULL);
     int check = timeDiff(&tvSpliceAck, &tvCheck);
-    if (check > (SPLICE_DELAY / 2)) { //TODO mess with this timiing - important
+    if (check > (SPLICE_DELAY / 8)) { //TODO mess with this timiing - important
         printf("Warning: Splice ack timeout, resending ratios\n");
         gettimeofday(&tvSplice, NULL);
         if (!spliceTx()) {
@@ -212,7 +211,7 @@ bool reqFile(int soc, char* filename) {
             //read acks from servers
             memset(pktIn, 0, PKTLEN_DATA);
             int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
-            rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
+            rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT); //TODO giving weird errors
             if (rxRes == RX_TERMINATED) return false;
             if (rxRes != RX_OK) continue; 
             if ((hdrIn->src > 3)||(hdrIn->src < 0)) {
@@ -221,7 +220,6 @@ bool reqFile(int soc, char* filename) {
             }
             if (hdrIn->type == TYPE_REQACK) {
                 serverAck[hdrIn->src] = 1; 
-                printf("Got ack from server %i!\n",hdrIn->src);
             } else if (hdrIn->type == TYPE_REQNAK) {
                 printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
                 return false;
