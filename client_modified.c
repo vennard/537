@@ -117,7 +117,8 @@ bool spliceRatio(int rxLen) {
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
         for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
-        if (DEBUG) {
+        //if (DEBUG) {
+        if (1) {
             printf("Total # packets received = %f\n",total);
             printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
             for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
@@ -138,7 +139,7 @@ bool spliceRatio(int rxLen) {
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
             if (change >= SPLICE_THRESH) {
                 //send ratio to servers
-                printf("Change threshold exceeded with change value %i, sending new splice ratios\n",change);
+                printf("Change (%i) exceeded at time %i, sending new splice ratios\n",change,checkTime);
                 if (!spliceTx()) return false;
             }
         }
