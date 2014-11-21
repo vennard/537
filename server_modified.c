@@ -59,6 +59,7 @@ bool lookupFile(char* file) {
 }
 
 bool receiveSplice(int soc, struct sockaddr_in* client) {
+    int i;
     unsigned int clientSize = sizeof (*client);
     pkthdr_spl* splIn = (pkthdr_spl*) pktIn;
     int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
@@ -73,6 +74,7 @@ bool receiveSplice(int soc, struct sockaddr_in* client) {
         return false;
     }
 
+
     if (DEBUG) {
         printf("Splice Comm Info:\n");
         printf("    src: %i\n",splIn->src);
@@ -80,10 +82,12 @@ bool receiveSplice(int soc, struct sockaddr_in* client) {
         printf("    type: %i\n",splIn->type);
         printf("    sseq: %i\n",splIn->sseq);
         printf("    ratios: \n");
-        int i;
         for (i = 0;i < 4;i++) printf(" %i-%i \n",i,splIn->ratios[i]);
         printf("finished splice check\n");
     }
+    printf("Got new splice ratios: "); 
+    for (i = 0;i < 4;i++) printf(" %i ",splIn->ratios[i]);
+    printf(" with sseq = %i\n", splIn->sseq);
 
     //send splice acknowledge
     if (!fillpkt(pktOut, serverName, ID_CLIENT, TYPE_SPLICE_ACK, 0, NULL, 0)) {
