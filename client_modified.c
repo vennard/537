@@ -344,7 +344,7 @@ int main(int argc, char *argv[]) {
     }
 
 	 // start transmission of file
-    printf("Requesting file '%s' from servers\n");
+    printf("Requesting file '%s' from servers\n",filename);
     if (reqFile(soc, filename) == false) { 
         printf("Error: Request failed, program stopped\n");
         close(soc);
