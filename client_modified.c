@@ -64,7 +64,7 @@ bool spliceTx() {
         for (i = 0;i < 4;i++) {
             if (fillpktSplice(pktOut, i, seqGap, sendRatio) == false) return false; 
             if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-            sendto(sock, sPkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+            sendto(sock, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
         }
     }
     printf("Sent splice ratios!!!\n");
