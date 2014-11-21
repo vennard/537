@@ -155,7 +155,7 @@ bool spliceRatio(int rxLen) {
             int change = 0;
             for (i = 0;i < 4;i++) change += abs(sendRatio[i] - oldRatio[i]); //TODO must scale with frame size
             for (i = 0;i < 4;i++) oldRatio[i] = sendRatio[i];
-            if (change >= SPLICE_THRESH) {
+            if ((change >= SPLICE_THRESH)&&(ackdNewRatios)) {
                 //send ratio to servers
                 printf("Change (%i) exceeded at time %i, sending new splice ratios\n",change,checkTime);
                 if (!spliceTx()) return false;
