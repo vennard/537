@@ -25,7 +25,7 @@ static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
 static unsigned char* payloadOut = pktOut + HDRLEN;
 
-static int serverName; //holds name of server (1-4)
+static int serverName; //holds name of server (0-3) never starting from 1 again... lol
 static int spliceRatios[4] = {(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME),(int) (.25 * SPLICE_FRAME)};
 static int nSpliceRatios[4] = {0,0,0,0}; //new splice ratios
 static int b[4] = {0,0,0,0};
@@ -230,8 +230,8 @@ void checkArgs(int argc, char *argv[]) {
     } else {
         char *ptr;
         serverName = (int) strtol(argv[1],&ptr,10);
-        if ((serverName < 1) || (serverName > 4)) {
-            printf("Invalid server number, must be 1-4\n");
+        if ((serverName < 0) || (serverName > 3)) {
+            printf("Invalid server number, must be 0-3\n");
             exit(1);
         }
         printf("Server %i selected.\n",serverName);

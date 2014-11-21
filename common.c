@@ -83,7 +83,7 @@ int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
     }
     pkthdr_common* hdr = (pkthdr_common*) pkt;
 
-	 if ((hdr->src < 1) || (hdr->src > 8)) return RX_ERR;
+	 if ((hdr->src < 0) || (hdr->src > 8)) return RX_ERR;
 	 return hdr->src;
 }
 

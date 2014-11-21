@@ -91,10 +91,11 @@ typedef struct pkthdr_spl {
 /* Nodes 1-8: codes 1-8 */
 #define ID_CLIENT 8
 //below server defines are hardcoded MUST REMAIN to simplify code
-#define ID_SERVER1 1
-#define ID_SERVER2 2
-#define ID_SERVER3 3
-#define ID_SERVER4 4
+//note - unused
+#define ID_SERVER1 0
+#define ID_SERVER2 1
+#define ID_SERVER3 2
+#define ID_SERVER4 3
 
 /* Packet lengths */
 #define PKTLEN_MSG 128 // fixed size for easy usage, can be changed in the future

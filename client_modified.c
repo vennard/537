@@ -40,7 +40,7 @@ bool spliceTx() {
     uint32_t seqGap = lastPkt + SPLICE_GAP;
     unsigned char sPkt[4][PKTLEN_MSG];
     for (i = 0;i < 4;i++) {
-       if (fillpktSplice(sPkt[i], (i+1), seqGap, sendRatio) == false) return false; 
+       if (fillpktSplice(sPkt[i], i, seqGap, sendRatio) == false) return false; 
     }
     //send new splice ratios
     for (i = 0;i < 4;i++) {
@@ -68,11 +68,10 @@ void spliceAckCheck(int rxLen){
     //read splice ack
     if (hdrIn->type == TYPE_SPLICE_ACK) {
         int src = checkRxSrc(rxLen, pktIn, ID_CLIENT); 
-        //printf("Got splice ack from server %i\n",src);
-        if ((src < 1)||(src > 4)) {
+        if ((src < 0)||(src > 3)) {
             printf("Error: Splice ack contains invalid src\n");
         } else {
-            ackdRatio[src-1] = true;
+            ackdRatio[src] = true;
         }
     }
     //exclude extremely congested lines from needing ack
@@ -98,8 +97,8 @@ bool spliceRatio(int rxLen) {
 
     //record where packet came from
     int src = checkRxSrc(rxLen, pktIn, ID_CLIENT);
-    if ((src < 1)||(src > 4)) return false;
-    srcpkts[src - 1]++;
+    if ((src < 0)||(src > 3)) return false;
+    srcpkts[src]++;
 
     //timer trigger for splice ratio calculations
     if (!started) {
@@ -178,7 +177,7 @@ bool reqFile(int soc, char* filename) {
     int i;
     for (i = 0;i < 4;i++) {
         if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-        if (fillpkt(pkt[i], ID_CLIENT, i+1, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) return false; 
+        if (fillpkt(pkt[i], ID_CLIENT, i, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) return false; 
     }
 
     // send the request and receive a reply
@@ -195,12 +194,12 @@ bool reqFile(int soc, char* filename) {
             rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
             if (rxRes == RX_TERMINATED) return false;
             if (rxRes != RX_OK) continue; 
-            if ((hdrIn->src > 4)||(hdrIn->src < 1)) {
+            if ((hdrIn->src > 3)||(hdrIn->src < 0)) {
                 printf("Error: invalid server source\n");
                 return false;
             }
             if (hdrIn->type == TYPE_REQACK) {
-                serverAck[hdrIn->src-1] = 1; 
+                serverAck[hdrIn->src] = 1; 
                 //printf("Got ack from server %i!\n",hdrIn->src);
             } else if (hdrIn->type == TYPE_REQNAK) {
                 printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
@@ -290,7 +289,7 @@ bool receiveMovie(int soc, char** filename) {
 char* checkArgs(int argc, char *argv[]) {
   char *filename;
   if ((argc != 6) && (argc != 5)) {
-	 printf("Usage: %s <server 1 ip> <server 2 ip> <server 3 ip> <server 4 ip> [<requested file>]\n",argv[0]);
+	 printf("Usage: %s <server 0 ip> <server 1 ip> <server 2 ip> <server 3 ip> [<requested file>]\n",argv[0]);
 	 exit(1);
   } else if (argc == 6) {
 	 filename = argv[5];
