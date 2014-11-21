@@ -40,11 +40,13 @@ void sigintHandler(int sig){
     printf("\nShutting down streaming service...\n");
 
     //send kill signal to servers
-    int i; 
-    for (i = 0;i < 4;i++) {
-        fillpkt(pktOut, ID_CLIENT, i, TYPE_FIN, 0, NULL, 0); 
-        initHostStruct(&server[i], saddr[i], UDP_PORT);
-        sendto(sock, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+    int i,j; 
+    for (j = 0;j < 2;j++) {
+        for (i = 0;i < 4;i++) {
+            fillpkt(pktOut, ID_CLIENT, i, TYPE_FIN, 0, NULL, 0); 
+            initHostStruct(&server[i], saddr[i], UDP_PORT);
+            sendto(sock, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
+        }
     }
     close(sock);
     exit(0);
@@ -70,12 +72,13 @@ bool spliceTx() {
     return true;
 }
 
+//TODO add splice error if lastSeq > sseq that was last sent!
 void spliceAckCheck(int rxLen){
     int i;
     //check splice timeout
     gettimeofday(&tvCheck, NULL);
     int check = timeDiff(&tvSpliceAck, &tvCheck);
-    if (check > (SPLICE_DELAY / 2)) {
+    if (check > (SPLICE_DELAY / 4)) {
         printf("Warning: Splice ack timeout, resending ratios\n");
         if (!spliceTx()) {
             printf("Error: Failed to resend splice ratios\n");

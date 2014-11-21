@@ -179,7 +179,7 @@ int stream(int soc, struct sockaddr_in* client, char* filename) {
     }
     int tseq = getSplice();
     if (tseq == -1) return 0;
-    printf("Sending %i\n",tseq);
+    //printf("Sending %i\n",tseq);
 
     if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, tseq, NULL, 0) == false) {
         return 2;

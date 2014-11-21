@@ -34,9 +34,9 @@
 /*******************
  * Critical Variables
  *******************/
-#define SPLICE_DELAY 15000 //time between calculating splice ratios
+#define SPLICE_DELAY 10000 //time between calculating splice ratios
 #define SPLICE_FRAME 100  //controls resolution of splice ratio from servers
-#define SPLICE_THRESH 5  //TODO threshold of change needed to send update
+#define SPLICE_THRESH 2  //TODO threshold of change needed to send update
 #define SPLICE_GAP 30 // + last received packet syncs splice changeover at servers
 #define SPLICE_IGNORE_THRESH 20 //threshold for excluding node from splice ack
 //above is 1/value for percentage of splice ratio to fall below to ignore
