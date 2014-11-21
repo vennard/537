@@ -80,6 +80,7 @@ void spliceAckCheck(int rxLen){
     int check = timeDiff(&tvSpliceAck, &tvCheck);
     if (check > (SPLICE_DELAY / 4)) {
         printf("Warning: Splice ack timeout, resending ratios\n");
+        gettimeofday(&tvSplice, NULL);
         if (!spliceTx()) {
             printf("Error: Failed to resend splice ratios\n");
         }
