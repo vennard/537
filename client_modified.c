@@ -117,8 +117,7 @@ bool spliceRatio(int rxLen) {
         float check = 0;
         for (i = 0;i < 4;i++) check+=srcRatio[i];
         for (i = 0;i < 4;i++) srcpkts[i] = 0; //clear packet data
-        //if (DEBUG) {
-        if (1) {
+        if (DEBUG) {
             printf("Total # packets received = %f\n",total);
             printf("Entered Splice Check at time %i\n ratios:\n",checkTime);
             for (i = 0;i < 4;i++) printf("%i: %f\n",i,srcRatio[i]);
