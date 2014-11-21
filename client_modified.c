@@ -60,7 +60,7 @@ void spliceAckCheck(int rxLen){
     //check splice timeout
     gettimeofday(&tvCheck, NULL);
     int check = timeDiff(&tvSpliceAck, &tvCheck);
-    if (check > (SPLICE_DELAY / 4)) {
+    if (check > (SPLICE_DELAY / 2)) {
         printf("Warning: Splice ack timeout, resending ratios\n");
         if (!spliceTx()) {
             printf("Error: Failed to resend splice ratios\n");
@@ -73,7 +73,7 @@ void spliceAckCheck(int rxLen){
         if ((src < 1)||(src > 4)) {
             printf("Error: Splice ack contains invalid src\n");
         } else {
-            ackdRatio[src] = true;
+            ackdRatio[src-1] = true;
         }
     }
     //check for all four acks
