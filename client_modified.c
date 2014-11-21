@@ -9,6 +9,7 @@
  * 	adding support for communication to all 4 servers
  */
 
+#include <signal.h>
 #include "common.h"
 #include "common.c"
 
@@ -33,6 +34,12 @@ bool ackdNewRatios = true;
 static bool ackdRatio[4] = {false,false,false,false}; //all true if got ack for each new splice ratio
 static int lastPkt = 0;
 
+//signal handler to catch ctrl+c exit
+void sigintHandler(int sig){
+    signal(SIGINT, sigintHandler);
+    printf("Exiting safely\n");
+    exit(0);
+}
 
 bool spliceTx() {
     uint8_t i, j;
@@ -272,8 +279,6 @@ bool receiveMovie(int soc, char** filename) {
         //store last sequence number received
         lastPkt = hdrIn->seq;
 
-        printf(" %i ",lastPkt); //DEBUG
-
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
@@ -311,6 +316,7 @@ char* checkArgs(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGINT, sigintHandler);
     char* filename = checkArgs(argc, argv);
 
 	 // initialize UDP socket
@@ -344,8 +350,6 @@ int main(int argc, char *argv[]) {
     } else {
         printf("File successfully transfered, local copy: client_%s\n", filename);
     }
-
-	exit(0); //DEBUG STOP TODO
 
     // clean up resources and plot 
     close(soc);
