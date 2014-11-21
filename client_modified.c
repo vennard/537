@@ -89,6 +89,8 @@ bool spliceRatio(int rxLen) {
     //check for splice acks
     if (!ackdNewRatios) spliceAckCheck(rxLen);
 
+    if (hdrIn->type == TYPE_SPLICE_ACK) return true;
+
     //check that packet is of valid type before recording
     if (hdrIn->type != TYPE_DATA) return false;
 
@@ -249,7 +251,10 @@ bool receiveMovie(int soc, char** filename) {
             continue;
         }
 
-        if (spliceRatio(rxLen) == false) return false; //access to splice ratio check and calculation
+        if (spliceRatio(rxLen) == false) {
+            printf("Error in spliceRatio function\n");
+            continue;
+        }
 
         if (hdrIn->type == TYPE_FIN) {
             fclose(graphDataFile);
