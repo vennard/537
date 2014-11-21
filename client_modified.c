@@ -34,6 +34,7 @@ bool ackdNewRatios = true;
 static bool ackdRatio[4] = {false,false,false,false}; //all true if got ack for each new splice ratio
 static int lastPkt = 0;
 
+//TODO add splice ack handler where we can accept cumulitive acks from each server as long as we dont exceed sseq, then would need to complete resend
 //signal handler to catch ctrl+c exit
 void sigintHandler(int sig){
     signal(SIGINT, sigintHandler);
@@ -78,7 +79,7 @@ void spliceAckCheck(int rxLen){
     //check splice timeout
     gettimeofday(&tvCheck, NULL);
     int check = timeDiff(&tvSpliceAck, &tvCheck);
-    if (check > (SPLICE_DELAY / 4)) {
+    if (check > (SPLICE_DELAY / 2)) { //TODO mess with this timiing - important
         printf("Warning: Splice ack timeout, resending ratios\n");
         gettimeofday(&tvSplice, NULL);
         if (!spliceTx()) {
@@ -220,7 +221,7 @@ bool reqFile(int soc, char* filename) {
             }
             if (hdrIn->type == TYPE_REQACK) {
                 serverAck[hdrIn->src] = 1; 
-                //printf("Got ack from server %i!\n",hdrIn->src);
+                printf("Got ack from server %i!\n",hdrIn->src);
             } else if (hdrIn->type == TYPE_REQNAK) {
                 printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
                 return false;
@@ -343,10 +344,7 @@ int main(int argc, char *argv[]) {
     }
 
 	 // start transmission of file
-    printf("Requesting file '%s' from servers with the following addresses\n", filename);
-    int i;
-    for (i = 0;i < 4;i++) printf("server%i: %s\n", i, saddr[i]);
-
+    printf("Requesting file '%s' from servers\n");
     if (reqFile(soc, filename) == false) { 
         printf("Error: Request failed, program stopped\n");
         close(soc);
