@@ -66,8 +66,9 @@ int udpInit(unsigned int localPort, unsigned int timeoutSec) {
 }
 
 //TODO change error codes away from server names
+
 int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
- 	 if ((pkt == NULL) || (expDst < 1)) {
+    if ((pkt == NULL) || (expDst < 1)) {
         printf("Warning: Unknown Rx error occurred\n");
         return RX_ERR;
     }
@@ -83,12 +84,12 @@ int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst) {
     }
     pkthdr_common* hdr = (pkthdr_common*) pkt;
 
-	 if ((hdr->src < 0) || (hdr->src > 8)) return RX_ERR;
-	 return hdr->src;
+    if (hdr->src > 8) return RX_ERR;
+    return hdr->src;
 }
 
 int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
-    if ((pkt == NULL) || (expDst < 0)) {
+    if ((pkt == NULL) || (expDst > 8)) {
         printf("Warning: Unknown Rx error occurred\n");
         return RX_ERR;
     }
@@ -96,7 +97,7 @@ int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
     if (rxRes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // timeout on socket
-            printf("Warning: Rx timeout on socket, trying again\n");
+            dprintf("Rx timeout on socket / nothing received\n");
             return RX_TIMEOUT;
         } else {
             printf("Warning: Rx error occurred\n");
@@ -148,8 +149,8 @@ unsigned int timeDiff(struct timeval* beg, struct timeval* end) {
     }
 }
 
-bool fillpktSplice( 
-        unsigned char* buf, uint8_t dst, 
+bool fillpktSplice(
+        unsigned char* buf, uint8_t dst,
         uint32_t sseq, uint8_t ratios[4]) {
 
     if (buf == NULL) {
@@ -168,8 +169,6 @@ bool fillpktSplice(
     spl->ratios[3] = ratios[3];
     return true;
 }
-
-
 
 bool fillpkt(
         unsigned char* buf,
@@ -238,6 +237,15 @@ void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
         case TYPE_FAIL:
             typeStr = "FAIL";
             break;
+        case TYPE_SPLICE:
+            typeStr = "SPLICE";
+            break;
+        case TYPE_SPLICE_ACK:
+            typeStr = "SPLICE_ACK";
+            break;
+        case TYPE_RATE:
+            typeStr = "RATE";
+            break;
     }
     if (isTx) {
         dirStr = "Tx";
@@ -247,4 +255,8 @@ void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
 
     dprintf("%s packet: TYPE=%s, SRC=%u, DST=%u, SEQ=%u, SIZE=%u\n",
             dirStr, typeStr, hdr->src, hdr->dst, hdr->seq, pktLen);
+}
+
+unsigned int rateToDelay(unsigned int rate) {    
+    return 1000000 / rate;
 }

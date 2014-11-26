@@ -7,8 +7,6 @@
 #ifndef COMMON_H
 #define	COMMON_H
 
-#define DEBUG 0
-
 /*******************
  * Includes 
  *******************/
@@ -29,6 +27,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 
 /*******************
@@ -49,6 +48,17 @@
 #define RECV_TIMEOUT 2 // timeout for recv call (secs)
 #define MAX_FILENAME_LEN 50 // maximum lenght of filenames
 #define TEST_FILE "/dev/urandom"
+#define RATE_STEP 5 // tx rate is changed by this amount (kB/s) when needed
+#define RATE_MAX 256 // maximum intended tx rate per server (kB/s)
+
+/*******************
+ * Packet buffer defines
+ *******************/
+#define BUF_MAX_OCCUP 0.5   // maximum intended rx buffer occupancy (ratio <0,1>)
+#define BUF_MIN_OCCUP 0.3   // minimum intended rx buffer occupancy (ratio <0,1>)
+#define BUF_SIZE 1000       // size (pkts) of the packet buffer (in client)
+#define BUF_LOST_THRSH 100  // missing packets older than seq=(newest seq)-LOST_THRSH are considered as lost 
+#define BUF_BUFFER_PKT 100  // number of packets to buffer before the streaming can start
 
 /*******************
  * Packet Headers
@@ -86,6 +96,7 @@ typedef struct pkthdr_spl {
 #define TYPE_FAIL 7     // client/server failed, stop the streaming (not used now)
 #define TYPE_SPLICE 8   // splice ratio change msg
 #define TYPE_SPLICE_ACK 9 // ack from server for new splice ratio
+#define TYPE_RATE 10    // request to set a certain tx rate
 
 /* Source/Destination codes */
 /* Nodes 1-8: codes 1-8 */
@@ -211,6 +222,18 @@ bool fillpkt(
  * tx: true if the packet was/is transmitted, false if received
  */
 void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx);
+
+
+/*
+ * rateToDelay
+ * 
+ * Convert tx rate to a corresponding delay between subsequent data packet transmissions
+ * 
+ * rate: rate in kB/s
+ * 
+ * Return value: delay in usecs
+ */
+unsigned int rateToDelay(unsigned int rate);
 
 #endif	/* COMMON_H */
 
