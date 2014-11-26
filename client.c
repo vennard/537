@@ -8,6 +8,7 @@
  */
 
 #include "common.h"
+#include "packet_buffer.h"
 
 // buffers for in/out packets
 static unsigned char pktIn[PKTLEN_DATA] = {0};
@@ -18,8 +19,9 @@ static unsigned char* payloadIn = pktIn + HDRLEN;
 //static unsigned char* payloadOut = pktOut + HDRLEN;
 
 //static int src1pkts, src2pkts, src3pkts, src4pkts = 0;
-//static struct timeval tvStart, tvRecv, tvCheck;
+static struct timeval tvStart, tvRecv, tvCheck;
 static char *s1, *s2, *s3, *s4; //server ip addresses
+static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
 
 bool spliceRatio(unsigned char *pkt) {
     return pkt;
@@ -43,12 +45,12 @@ bool plotGraph(void) {
     return true;
 }
 
-bool reqFile(int soc, char* serverIpStr, char* filename) {
+bool reqFile(int soc, char* filename) {
     // create structures for the server info
     struct sockaddr_in server, sender;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-    if (initHostStruct(&server, serverIpStr, UDP_PORT) == false) {
+    if (initHostStruct(&server, s1, UDP_PORT) == false) {
         return false;
     }
 
@@ -58,6 +60,8 @@ bool reqFile(int soc, char* serverIpStr, char* filename) {
     }
 
     // send the request and receive a reply
+    gettimeofday(&tvStart, NULL);
+    gettimeofday(&tvCheck, NULL);
     while (errCount++ < MAX_ERR_COUNT) {
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
         dprintPkt(pktOut, PKTLEN_MSG, true);
@@ -81,22 +85,32 @@ bool reqFile(int soc, char* serverIpStr, char* filename) {
 }
 
 bool receiveMovie(int soc, char** filename) {
-    struct sockaddr_in sender;
+    struct sockaddr_in server, sender;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-    struct timeval tvStart, tvRecv;
-
-    if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
-    char streamedFilename[strlen(*filename) + 10];
-    snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
-    FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
-    FILE* streamedFile = fopen(streamedFilename, "wb");
-    if ((graphDataFile == NULL) || (streamedFile == NULL)) {
-        printf("Error: Local data file could not be opened, program stopped\n");
+    bool streamReady = false;
+    if (initHostStruct(&server, s1, UDP_PORT) == false) {
         return false;
     }
 
-    gettimeofday(&tvStart, NULL);
+    // set local data file name
+    if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
+    char streamedFilename[strlen(*filename) + 10];
+    snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
+
+    // init packet buffer
+    if (bufInit(streamedFilename) == false) {
+        printf("Error: packet buffer could not be initialized, program stopped\n");
+        return false;
+    }
+
+    // create graph file
+    FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
+    if (graphDataFile == NULL) {
+        printf("Error: Graph file could not be created, program stopped\n");
+        return false;
+    }
+
     while (errCount < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_DATA);
         int rxLen = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
@@ -105,37 +119,106 @@ bool receiveMovie(int soc, char** filename) {
         int rxRes = checkRxStatus(rxLen, pktIn, ID_CLIENT);
         if (rxRes == RX_TERMINATED) {
             fclose(graphDataFile);
-            fclose(streamedFile);
+            bufFinish();
             return false;
         } else if (rxRes != RX_OK) {
             errCount++;
             continue;
         }
 
-        if (hdrIn->type == TYPE_FIN) {
-            fclose(graphDataFile);
-            fclose(streamedFile);
-            return true;
-        } else if (hdrIn->type != TYPE_DATA) {
-            printf("Warning: Received an unexpected packet type, ignoring it\n");
-            errCount++;
-            continue;
+        switch (hdrIn->type) {
+            case TYPE_DATA:
+                // expected type
+                break;
+            case TYPE_FIN:
+                fclose(graphDataFile);
+                bufFinish();
+                return true;
+            case TYPE_SPLICE_ACK:
+                // deal with splice 
+                continue;
+            default:
+                printf("Warning: Received an unexpected packet type, ignoring it\n");
+                errCount++;
+                continue;
         }
 
         spliceRatio(pktIn);
 
+        // add received packet in the buffer
+        if (bufAdd(hdrIn->seq, payloadIn) == false) {
+            printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
+        }
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
         }
-        if (fwrite(payloadIn, 1, rxLen - HDRLEN, streamedFile) != (rxLen - HDRLEN)) {
-            printf("Warning: Streamed local file write error\n");
+
+        diff = timeDiff(&tvCheck, &tvRecv);
+        if (diff >= 100) {
+            gettimeofday(&tvCheck, NULL);
+
+            /*************************************
+             * TRIGGERED BY THE TIMER (SECTION START)*/
+
+            if (streamReady == true || bufGetSubseqCount() >= BUF_BUFFER_PKT) {
+                streamReady = true;
+                // "play" a frame every 10 ms
+                for (unsigned int i = 0; i < diff / 10; i++) {
+                    if (bufFlushFrame() == false) {
+                        // frame missing
+                        return false;
+                    }
+                }
+            }
+            // adjust tx rates
+            double bufOc = bufGetOccupancy();
+            dprintf("Buffer occupancy OCC=%f\n", bufOc);
+            if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
+                if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
+                    currTxRate /= 2;
+                    dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
+                    // TODO: broadcast the request
+                    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                        return false;
+                    }
+                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                    dprintPkt(pktOut, PKTLEN_MSG, true);
+                } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate*2 <= RATE_MAX)) {
+                    currTxRate *= 2;
+                    dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
+                    // TODO: broadcast the request
+                    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                        return false;
+                    }                   
+                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                    dprintPkt(pktOut, PKTLEN_MSG, true);
+                }
+            }
+
+            // request lost packets
+            uint32_t lostSeq = bufGetFirstLost();
+            while (lostSeq > 0) {
+                dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
+
+                // TODO: send the request to the server with the highest splice ratio
+                if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
+                    return false;
+                }
+                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                dprintPkt(pktOut, PKTLEN_MSG, true);
+
+                lostSeq = bufGetNextLost();
+            }
+
+            /* TRIGGERED BY THE TIMER (SECTION END)
+             ***************************************/
         }
     }
 
     printf("Error: Received maximum number of subsequent bad packets\n");
     fclose(graphDataFile);
-    fclose(streamedFile);
+    bufFinish();
     return false;
 }
 
@@ -143,14 +226,14 @@ char* checkArgs(int argc, char *argv[]) {
     char *filename;
     if ((argc != 6) && (argc != 5)) {
         printf("Usage: %s <server 1 ip> <server 2 ip> <server 3 ip> <server 4 ip> [<requested file>]\n", argv[0]);
-        exit(1);
+        exit(0);
     } else if (argc == 6) {
         filename = argv[5];
         if (strlen(filename) > MAX_FILENAME_LEN) {
             printf("Error: Filename too long\n");
             exit(1);
         }
-    } else {
+    } else { // argc == 5
         filename = TEST_FILE;
     }
     s1 = argv[1];
@@ -174,7 +257,7 @@ int main(int argc, char *argv[]) {
 
     // start transmission of file
     printf("Requesting file '%s' from the server\n", filename);
-    if (reqFile(soc, argv[1], filename) == false) {
+    if (reqFile(soc, filename) == false) {
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);

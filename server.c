@@ -5,16 +5,16 @@
  * Jan Beran
  */
 
-#define _BSD_SOURCE // for usleap
+#define _BSD_SOURCE // for usleep
 #include "common.h"
-#define TX_DELAY 100000
 
 // File database
 #define FILE_COUNT 2
 #define FILE1 "pic.bmp" // approx 30 packets
 #define FILE2 TEST_FILE // EMPTY_PKT_COUNT empty packets
-#define EMPTY_PKT_COUNT 100
+#define EMPTY_PKT_COUNT 5000
 static char* fileDb[FILE_COUNT] = {FILE1, FILE2}; // file DB
+static unsigned int delayTx;
 
 // in/out packet structures
 static unsigned char pktIn[PKTLEN_MSG] = {0};
@@ -40,6 +40,11 @@ bool lookupFile(char* file) {
 bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     unsigned int clientSize = sizeof (*client);
     unsigned int errCount = 0;
+    
+    // set socket to blocking mode
+    int opts = fcntl(soc,F_GETFL);
+    opts = opts & (~O_NONBLOCK);
+    fcntl(soc,F_SETFL,opts);
 
     while (errCount++ < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_MSG);
@@ -81,6 +86,8 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
 }
 
 bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
+    unsigned int clientSize = sizeof (*client);
+    delayTx = rateToDelay(RATE_MAX);
     bool isTest = false;
     if (strcmp(filename, TEST_FILE) == 0) isTest = true;
 
@@ -90,13 +97,52 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
         return false;
     }
 
+    // set socket to non-blocking mode
+    int opts = fcntl(soc,F_GETFL);
+    opts = (opts | O_NONBLOCK);
+    fcntl(soc,F_SETFL,opts);
+
     unsigned int readSize = PKTLEN_DATA - HDRLEN;
     unsigned int seq = 1;
+    uint32_t misSeq;
     while (readSize == PKTLEN_DATA - HDRLEN) {
+        // probe incoming message queue
+        int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &clientSize);
+        rxRes = checkRxStatus(rxRes, pktIn, ID_SERVER1);
+
+        if (rxRes == RX_TERMINATED) return false;
+        if (rxRes == RX_OK) {
+            // packet received
+            switch (hdrIn->type) {
+                case TYPE_RATE:
+                    delayTx = rateToDelay(*((unsigned int*)payloadIn));
+                    dprintf("Tx rate changed to RATE=%u kB/s\n", (unsigned int) *payloadIn);
+                    break;
+                case TYPE_NAK:
+                    misSeq = (uint32_t) * payloadIn;
+                    dprintf("Received request for a missing packet, SEQ=%u\n", misSeq);
+                    if (isTest == false) {
+                        printf("Warning: Packet recovery not supported with real files\n");
+                        break;
+                    }
+                    fillpkt(pktOut, ID_SERVER1, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
+                    fread(payloadOut, 1, DATALEN, streamFile);
+                    sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
+                    dprintPkt(pktOut, PKTLEN_DATA, true);
+                    break;
+                case TYPE_SPLICE:
+                    // deal with splice pkt ?
+                    break;               
+                default:
+                    break;
+            }
+        }
+
+        // send data
         if (fillpkt(pktOut, ID_SERVER1, ID_CLIENT, TYPE_DATA, seq, NULL, 0) == false) {
             return false;
         }
-        readSize = fread(payloadOut, 1, PKTLEN_DATA - HDRLEN, streamFile);
+        readSize = fread(payloadOut, 1, DATALEN, streamFile);
         int res = sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
         if (res == -1) {
             printf("Warning: tx error occurred for SEQ=%u\n", seq);
@@ -106,7 +152,7 @@ bool streamFile(int soc, struct sockaddr_in* client, char* filename) {
 
         seq++;
         if ((isTest == true) && (seq == EMPTY_PKT_COUNT)) break;
-        usleep(TX_DELAY);
+        usleep(delayTx);
     }
 
     fclose(streamFile);
