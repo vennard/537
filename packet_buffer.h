@@ -13,9 +13,6 @@
  * Buffer defines
  *******************/
 
-#define BUF_SIZE 1000 // size (pkts) of the packet buffer (in client)
-#define BUF_LOST_THRSH 100 // missing packets older than seq=(newest seq)-LOST_THRSH are considered as lost 
-
 // possible states of the received packet - internal use only
 #define BUF_SEQ_OLD -3  // seq < beginning of the buffer
 #define BUF_SEQ_HIGH -2 // seq > end of the buffer
