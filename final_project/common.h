@@ -7,6 +7,8 @@
 #ifndef COMMON_H
 #define	COMMON_H
 
+#define DEBUG 1
+
 /*******************
  * Includes 
  *******************/
@@ -50,6 +52,14 @@
 #define TEST_FILE "/dev/urandom"
 #define RATE_STEP 5 // tx rate is changed by this amount (kB/s) when needed
 #define RATE_MAX 256 // maximum intended tx rate per server (kB/s)
+
+/*******************
+ * Send file defines
+ *******************/
+#define FILE_COUNT 2
+#define FILE1 "pic.bmp" // approx 30 packets
+#define FILE2 TEST_FILE // EMPTY_PKT_COUNT empty packets
+#define EMPTY_PKT_COUNT 5000
 
 /*******************
  * Packet buffer defines
