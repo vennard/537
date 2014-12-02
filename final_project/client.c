@@ -16,22 +16,18 @@
 #include <signal.h>
 #include "common.h"
 #include "packet_buffer.h"
-/*
-#include "common.c"
-#include "packet_buffer.c"
-
-*/
-
 
 /* Variable Declarations */
 static char *saddr[4]; //server ip addresses
 static struct sockaddr_in server[4];
 static int sock;
+
 //in/out packet structures
 static unsigned char pktIn[PKTLEN_DATA] = {};
 static unsigned char pktOut[PKTLEN_MSG] = {};
 static pkthdr_common* hdrIn = (pkthdr_common*) pktIn;
 static unsigned char* payloadIn = pktIn + HDRLEN;
+
 //rate calculations, splice variables and timers
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice, tvSpliceAck;
 static float srcpkts[4] = {};
@@ -195,21 +191,25 @@ bool receiveMovie(int soc, char** filename) {
                 if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
                     currTxRate /= 2;
                     dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
-                    // TODO: broadcast the request
-                    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
-                        return false;
+                    // broadcast decrease rate request to all servers
+                    for (int i = 0;i < 4;i++) {
+                        if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                            return false;
+                        }
+                        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+                        dprintPkt(pktOut, PKTLEN_MSG, true);
                     }
-                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
-                    dprintPkt(pktOut, PKTLEN_MSG, true);
                 } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate*2 <= RATE_MAX)) {
                     currTxRate *= 2;
                     dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
-                    // TODO: broadcast the request
-                    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
-                        return false;
-                    }                   
-                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
-                    dprintPkt(pktOut, PKTLEN_MSG, true);
+                    // broadcast increase rate request to all servers
+                    for (int i = 0;i < 4;i++) {
+                        if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                            return false;
+                        }                   
+                        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+                        dprintPkt(pktOut, PKTLEN_MSG, true);
+                    }
                 }
             }
 
@@ -218,11 +218,19 @@ bool receiveMovie(int soc, char** filename) {
             while (lostSeq > 0) {
                 dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
 
-                // TODO: send the request to the server with the highest splice ratio
-                if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
+                // send the request to the server with the highest splice ratio
+                int max = 0; 
+                int maxServer = 0;
+                for (int i = 0;i < 4;i++) {
+                    if (sendRatio[i] > max) {
+                        max = sendRatio[i];
+                        maxServer = i;
+                    }
+                }
+                if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
                     return false;
                 }
-                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[maxServer], sizeof (server[maxServer]));
                 dprintPkt(pktOut, PKTLEN_MSG, true);
 
                 lostSeq = bufGetNextLost();
