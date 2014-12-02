@@ -39,6 +39,7 @@ bool ackdNewRatios = true;
 static bool ackdRatio[4] = {[0 ... 3] = false}; 
 static int lastPkt = 0;
 static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
+FILE* graphDataFile;
 
 /* Function Declarations */
 char* checkArgs(int argc, char *argv[]);
@@ -100,7 +101,7 @@ bool receiveMovie(int soc) {
     unsigned int errCount = 0;
 
     // create graph file
-    FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
+    graphDataFile = fopen(GRAPH_DATA_FILE, "w");
     if (graphDataFile == NULL) {
         printf("Error: Graph file could not be created, program stopped\n");
         return false;
@@ -141,8 +142,6 @@ bool receiveMovie(int soc) {
                 errCount++;
                 continue;
         }
-
-        //TODO check for missing packets
 
         //store last sequence number received
         lastPkt = hdrIn->seq;
@@ -241,7 +240,7 @@ bool reqFile(int soc, char** filename) {
     unsigned char pkt[4][PKTLEN_MSG];
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-    unsigned int serverAck[4] = {0, 0, 0, 0};
+    unsigned int serverAck[4] = {[0 ... 3] = false};
     bool done = false;
     
     // set local data file name
@@ -260,44 +259,58 @@ bool reqFile(int soc, char** filename) {
     for (i = 0;i < 4;i++) {
         if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
         if (fillpkt(pkt[i], ID_CLIENT, i, TYPE_REQ, 0, (unsigned char*) *filename, strlen(*filename)) == false) return false; 
+        sendto(soc, pkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
     }
 
     // send the request and receive a reply
     gettimeofday(&tvStart, NULL); //start time from acknowledge of start request
-    while (errCount++ < MAX_ERR_COUNT) {
-        int i;
-        for (i = 0;i < 4;i++) {
-            //send request if not received ack
-            if (serverAck[i] != 1) sendto(soc, pkt[i], PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof(server[i]));
-
-            //read acks from servers
-            memset(pktIn, 0, PKTLEN_DATA);
-            int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
-            rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT); //TODO giving weird errors
-            if (rxRes == RX_TERMINATED) return false;
-            if (rxRes != RX_OK) continue; 
-            if (hdrIn->src > 3) {
-                printf("Error: invalid server source\n");
-                return false;
-            }
-            if (hdrIn->type == TYPE_REQACK) {
-                serverAck[hdrIn->src] = 1; 
-            } else if (hdrIn->type == TYPE_REQNAK) {
-                printf("Error: Server %i refused to stream the requested file\n",hdrIn->src);
-                return false;
-            } else { //got invalid type
-                printf("Warning: received unexpected packet type, ignoring it\n");
-            }
-        }
+    while (errCount < MAX_ERR_COUNT) {
         //check for acks from each server
         done = true;
-        for (i = 0;i < 4;i++) {
-            if (serverAck[i] == 0) done = false;
-        }
+        for (i = 0;i < 4;i++) if (!serverAck[i]) done = false;
         if (done) {
-            printf("Received acks from all servers!\n");
+            printf("Received all acks from servers!\n");
             return true;
         }
+        //read acks from servers
+        memset(pktIn, 0, PKTLEN_DATA);
+        int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
+        gettimeofday(&tvRecv, NULL); 
+        rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT); 
+        if (rxRes == RX_TERMINATED) return false;
+        if (rxRes != RX_OK) continue; 
+        if (hdrIn->src > 3) {
+            printf("Error: invalid server source\n");
+            return false;
+        }
+        switch (hdrIn->type) {
+            case TYPE_REQACK:
+                serverAck[hdrIn->src] = true;
+                continue;
+            case TYPE_DATA:
+                //Receive packet before all acks from servers received 
+                if (serverAck[hdrIn->src]) {
+                     // add received packet in the buffer
+                    if (bufAdd(hdrIn->seq, payloadIn) == false) {
+                        printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
+                    }
+                    unsigned int diff = timeDiff(&tvStart, &tvRecv);
+                    if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
+                        printf("Warning: Graph data file write error\n");
+                    }           
+                } else {
+                    dprintf("Warning: got data pkt before acknowledge from that server\n");
+                }
+                continue;
+                break;
+            case TYPE_NAK:
+                printf("Got missing pkt request before all start request acks\n");
+                break;
+            default:
+                printf("Warning: received unexpected packet type, ignoring it\n");
+                break;
+        }
+        errCount++;
     }
     printf("Error: Maximum number of request attempts reached\n");
     return false;
