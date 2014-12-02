@@ -204,12 +204,24 @@ bool receiveMovie(int soc) {
                 // send the request to the server with the highest splice ratio
                 int max = 0;
                 int maxServer = 0;
+                int oldVal = sendRatio[0];
+                bool allEqual = true;
                 for (int i = 0; i < 4; i++) {
                     if (sendRatio[i] > max) {
                         max = sendRatio[i];
                         maxServer = i;
                     }
+                    if (i > 0) {
+                        if (oldVal != sendRatio[i]) allEqual = false;
+                        oldVal = sendRatio[i];
+                    }
                 }
+                //If all splice ratios are equal send request to random server
+                if (allEqual) {
+                    srand(time(NULL));
+                    maxServer = rand() % 4;
+                }
+
                 if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
                     return false;
                 }
