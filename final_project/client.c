@@ -430,7 +430,7 @@ bool spliceTx() {
     for (i = 0; i < 4; i++) ackdRatio[i] = false;
 
     //double tap sending splice ratios - TODO see if necessary
-    for (j = 0; j < 2; j++) {
+    for (j = 0; j < 1; j++) {
         for (i = 0; i < 4; i++) {
             if (fillpktSplice(pktOut, i, seqGap, sendRatio) == false) return false;
             if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
