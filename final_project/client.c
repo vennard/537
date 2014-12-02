@@ -294,10 +294,12 @@ bool reqFile(int soc, char** filename) {
                     if (bufAdd(hdrIn->seq, payloadIn) == false) {
                         printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
                     }
+                    printf("GOT HERE: 1\n");
                     unsigned int diff = timeDiff(&tvStart, &tvRecv);
                     if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
                         printf("Warning: Graph data file write error\n");
                     }
+                    printf("GOT HERE: 2\n");
                 } else {
                     dprintf("Warning: got data pkt before acknowledge from that server\n");
                 }
