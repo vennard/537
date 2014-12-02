@@ -174,6 +174,18 @@ bool initHostStruct(struct sockaddr_in* host, char* ipAddrStr, unsigned int port
  */
 int udpInit(unsigned int localPort, unsigned int timeoutSec);
 
+/* checkRxSrc
+ *
+ * check the source of the packet
+ */
+int checkRxSrc(int rxRes, unsigned char* pkt, uint8_t expDst);
+
+/*
+ * fillpktSplice
+ *
+ * Fills splice update packet with all necessary info
+ */
+bool fillpktSplice(unsigned char* buf, uint8_t dst,uint32_t sseq, uint8_t ratios[4]);
 
 /* 
  * checkRxStatus
@@ -198,8 +210,7 @@ int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst);
  * end: pointer to a timeval value, end of the measured time interval
  * 
  * Return value: elapsed time in msecs, UINT_MAX if error occured (e.g. end < beg)
- */
-unsigned int timeDiff(struct timeval* beg, struct timeval* end);
+ */ unsigned int timeDiff(struct timeval* beg, struct timeval* end);
 
 /*
  * fillpkt
