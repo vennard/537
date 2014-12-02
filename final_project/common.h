@@ -57,7 +57,7 @@
 #define FILE_COUNT 2
 #define FILE1 "pic.bmp" // approx 30 packets
 #define FILE2 TEST_FILE // EMPTY_PKT_COUNT empty packets
-#define EMPTY_PKT_COUNT 5000
+#define EMPTY_PKT_COUNT 500
 
 /*******************
  * Packet buffer defines
