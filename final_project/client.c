@@ -15,7 +15,12 @@
 
 #include <signal.h>
 #include "common.h"
+#include "packet_buffer.h"
+/*
 #include "common.c"
+#include "packet_buffer.c"
+
+*/
 
 
 /* Variable Declarations */
@@ -37,11 +42,12 @@ bool startedSplice = false;
 bool ackdNewRatios = true;
 static bool ackdRatio[4] = {[0 ... 3] = false}; 
 static int lastPkt = 0;
+static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
 
 /* Function Declarations */
 char* checkArgs(int argc, char *argv[]);
 bool plotGraph(void);
-void sigintHandler(int sig);
+void sigintHandler();
 bool spliceTx();
 void spliceAckCheck(int rxLen);
 bool spliceRatio(int rxLen);
@@ -93,66 +99,143 @@ int main(int argc, char *argv[]) {
 
 bool receiveMovie(int soc, char** filename) {
     struct sockaddr_in sender;
+    bool streamReady = false;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
+
+    // set local data file name
     if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
     char streamedFilename[strlen(*filename) + 10];
     snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
-    FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
-    FILE* streamedFile = fopen(streamedFilename, "wb");
-    if ((graphDataFile == NULL) || (streamedFile == NULL)) {
-        printf("Error: Local data file could not be opened, program stopped\n");
+
+    // init packet buffer
+    if (bufInit(streamedFilename) == false) {
+        printf("Error: packet buffer could not be initialized, program stopped\n");
         return false;
     }
+
+    // create graph file
+    FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
+    if (graphDataFile == NULL) {
+        printf("Error: Graph file could not be created, program stopped\n");
+        return false;
+    }
+
+    //FILE* streamedFile = fopen(streamedFilename, "wb");
 
     while (errCount < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_DATA);
         int rxLen = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
-        gettimeofday(&tvRecv, NULL); // get a timestamp
+        gettimeofday(&tvRecv, NULL); 
 
         int rxRes = checkRxStatus(rxLen, pktIn, ID_CLIENT);
         if (rxRes == RX_TERMINATED) {
             fclose(graphDataFile);
-            fclose(streamedFile);
+            bufFinish();
             return false;
         } else if (rxRes != RX_OK) {
             errCount++;
             continue;
         }
 
-        if (spliceRatio(rxLen) == false) {
-            printf("Error in spliceRatio function\n");
-            continue;
+        switch (hdrIn->type) {
+            case TYPE_SPLICE_ACK:
+            case TYPE_DATA:
+                // expected type - deal with splice ratios
+                if (spliceRatio(rxLen) == false) {
+                    printf("Error in spliceRatio function\n");
+                    continue;
+                }       
+                break;
+            case TYPE_FIN:
+                fclose(graphDataFile);
+                bufFinish();
+                return true;
+            default:
+                printf("Warning: Received an unexpected packet type, ignoring it\n");
+                errCount++;
+                continue;
         }
-        //TODO check for missing packets
 
-        if (hdrIn->type == TYPE_FIN) {
-            fclose(graphDataFile);
-            fclose(streamedFile);
-            return true;
-        } else if (hdrIn->type == TYPE_SPLICE_ACK) {
-            continue;
-        } else if (hdrIn->type != TYPE_DATA) { 
-            printf("Warning: Received an unexpected packet type, ignoring it\n");
-            errCount++;
-            continue;
-        }
+        //TODO check for missing packets
 
         //store last sequence number received
         lastPkt = hdrIn->seq;
 
+        // add received packet in the buffer
+        if (bufAdd(hdrIn->seq, payloadIn) == false) {
+            printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
+        }
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
         }
-        if (fwrite(payloadIn, 1, rxLen - HDRLEN, streamedFile) != (rxLen - HDRLEN)) {
-            printf("Warning: Streamed local file write error\n");
+
+        diff = timeDiff(&tvCheck, &tvRecv);
+        if (diff >= 100) {
+            gettimeofday(&tvCheck, NULL);
+
+        /*************************************
+         * TRIGGERED BY THE TIMER (SECTION START)*/
+
+            if (streamReady == true || bufGetSubseqCount() >= BUF_BUFFER_PKT) {
+                streamReady = true;
+                // "play" a frame every 10 ms
+                for (unsigned int i = 0; i < diff / 10; i++) {
+                    if (bufFlushFrame() == false) {
+                        // frame missing
+                        return false;
+                    }
+                }
+            }
+            // adjust tx rates
+            double bufOc = bufGetOccupancy();
+            dprintf("Buffer occupancy OCC=%f\n", bufOc);
+            if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
+                if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
+                    currTxRate /= 2;
+                    dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
+                    // TODO: broadcast the request
+                    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                        return false;
+                    }
+                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                    dprintPkt(pktOut, PKTLEN_MSG, true);
+                } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate*2 <= RATE_MAX)) {
+                    currTxRate *= 2;
+                    dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
+                    // TODO: broadcast the request
+                    if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                        return false;
+                    }                   
+                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                    dprintPkt(pktOut, PKTLEN_MSG, true);
+                }
+            }
+
+            // request lost packets
+            uint32_t lostSeq = bufGetFirstLost();
+            while (lostSeq > 0) {
+                dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
+
+                // TODO: send the request to the server with the highest splice ratio
+                if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
+                    return false;
+                }
+                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server, sizeof (server));
+                dprintPkt(pktOut, PKTLEN_MSG, true);
+
+                lostSeq = bufGetNextLost();
+            }
+
+            /* TRIGGERED BY THE TIMER (SECTION END)
+             ***************************************/
         }
     }
 
     printf("Error: Received maximum number of subsequent bad packets\n");
     fclose(graphDataFile);
-    fclose(streamedFile);
+    bufFinish();
     return false;
 }
 
@@ -185,7 +268,7 @@ bool reqFile(int soc, char* filename) {
             rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT); //TODO giving weird errors
             if (rxRes == RX_TERMINATED) return false;
             if (rxRes != RX_OK) continue; 
-            if ((hdrIn->src > 3)||(hdrIn->src < 0)) {
+            if (hdrIn->src > 3) {
                 printf("Error: invalid server source\n");
                 return false;
             }
@@ -342,7 +425,7 @@ bool plotGraph(void) {
 }
 
 //signal handler to catch ctrl+c exit
-void sigintHandler(int sig){
+void sigintHandler(){
     signal(SIGINT, sigintHandler);
     printf("\nShutting down streaming service...\n");
     //send kill signal to servers
