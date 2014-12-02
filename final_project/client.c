@@ -274,7 +274,7 @@ bool reqFile(int soc, char** filename) {
         }
         //read acks from servers
         memset(pktIn, 0, PKTLEN_DATA);
-        int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) &sender, &senderSize);
+        int rxRes = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
         gettimeofday(&tvRecv, NULL);
         rxRes = checkRxStatus(rxRes, pktIn, ID_CLIENT);
         if (rxRes == RX_TERMINATED) return false;
