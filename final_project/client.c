@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 
 bool receiveMovie(int soc) {
     struct sockaddr_in sender;
-    bool streamReady = false;
+    //bool streamReady = false;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
 
@@ -155,6 +155,7 @@ bool receiveMovie(int soc) {
             /*************************************
              * TRIGGERED BY THE TIMER (SECTION START)*/
 
+            /*
             if (streamReady == true || bufGetSubseqCount() >= BUF_BUFFER_PKT) {
                 streamReady = true;
                 // "play" a frame every 10 ms
@@ -165,6 +166,7 @@ bool receiveMovie(int soc) {
                     }
                 }
             }
+            */
             // adjust tx rates
             double bufOc = bufGetOccupancy();
             dprintf("Buffer occupancy OCC=%f\n", bufOc);

@@ -113,6 +113,12 @@ void mainLoop(int soc) {
 int stream(int soc, struct sockaddr_in* client) {
     int i;
 
+    //check end condition
+    if (seq > EMPTY_PKT_COUNT) {
+        if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_FIN, 0, NULL, 0) == false) return 2;
+        return 1;
+    }
+
     //check for splice ratio change over sequence number
     if ((seq >= sseq) && (waitSpliceChange)) {
         dprintf("Switching splice ratios\n");
@@ -121,6 +127,7 @@ int stream(int soc, struct sockaddr_in* client) {
     }
     int tseq = getSplice();
     if (tseq == -1) return 0;
+
 
     if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, tseq, NULL, 0) == false) return 2;
 
