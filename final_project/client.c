@@ -243,7 +243,14 @@ bool reqFile(int soc, char** filename) {
     unsigned int errCount = 0;
     unsigned int serverAck[4] = {0, 0, 0, 0};
     bool done = false;
-    
+
+    //create targets and fill request data for all servers
+    int i;
+    for (i = 0;i < 4;i++) {
+        if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
+        if (fillpkt(pkt[i], ID_CLIENT, i, TYPE_REQ, 0, (unsigned char*) *filename, strlen(*filename)) == false) return false; 
+    }
+
     // set local data file name
     if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
     char streamedFilename[strlen(*filename) + 10];
@@ -254,14 +261,7 @@ bool reqFile(int soc, char** filename) {
         printf("Error: packet buffer could not be initialized, program stopped\n");
         return false;
     }
-
-    //create targets and fill request data for all servers
-    int i;
-    for (i = 0;i < 4;i++) {
-        if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-        if (fillpkt(pkt[i], ID_CLIENT, i, TYPE_REQ, 0, (unsigned char*) *filename, strlen(*filename)) == false) return false; 
-    }
-
+    
     // send the request and receive a reply
     gettimeofday(&tvStart, NULL); //start time from acknowledge of start request
     while (errCount++ < MAX_ERR_COUNT) {
