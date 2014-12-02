@@ -25,7 +25,7 @@ static int b[4] = {};
 static int sseq = 0;
 static bool waitSpliceChange = false;
 static bool emptyBucket = true;
-static int seq = 0;
+static int seq = 1;
 
 //in/out packet structures
 static unsigned char pktIn[PKTLEN_MSG] = {};
