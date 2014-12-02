@@ -100,14 +100,7 @@ bool receiveMovie(int soc) {
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
 
-    // create graph file
-    graphDataFile = fopen(GRAPH_DATA_FILE, "w");
-    if (graphDataFile == NULL) {
-        printf("Error: Graph file could not be created, program stopped\n");
-        return false;
-    }
-
-    //FILE* streamedFile = fopen(streamedFilename, "wb");
+    
 
     while (errCount < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_DATA);
@@ -243,6 +236,13 @@ bool reqFile(int soc, char** filename) {
     unsigned int serverAck[4] = {[0 ... 3] = false};
     bool done = false;
 
+    // create graph file
+    graphDataFile = fopen(GRAPH_DATA_FILE, "w");
+    if (graphDataFile == NULL) {
+        printf("Error: Graph file could not be created, program stopped\n");
+        return false;
+    }
+
     //create targets and fill request data for all servers
     int i;
     for (i = 0; i < 4; i++) {
@@ -294,12 +294,10 @@ bool reqFile(int soc, char** filename) {
                     if (bufAdd(hdrIn->seq, payloadIn) == false) {
                         printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
                     }
-                    printf("GOT HERE: 1\n");
                     unsigned int diff = timeDiff(&tvStart, &tvRecv);
                     if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
                         printf("Warning: Graph data file write error\n");
                     }
-                    printf("GOT HERE: 2\n");
                 } else {
                     dprintf("Warning: got data pkt before acknowledge from that server\n");
                 }
