@@ -47,8 +47,8 @@ void sigintHandler();
 bool spliceTx();
 void spliceAckCheck(int rxLen);
 bool spliceRatio(int rxLen);
-bool reqFile(int soc, char* filename);
-bool receiveMovie(int soc, char** filename);
+bool reqFile(int soc, char** filename);
+bool receiveMovie(int soc);
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigintHandler);
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
 
     // start transmission of file
     printf("Requesting file '%s' from servers\n",filename);
-    if (reqFile(soc, filename) == false) { 
+    if (reqFile(soc, &filename) == false) { 
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     }
 
 	 // receive movie
-    if (receiveMovie(soc, &filename) == false) {
+    if (receiveMovie(soc) == false) {
         printf("Error: Error during the file streaming, program stopped\n");
         close(soc);
         exit(1);
@@ -93,22 +93,11 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-bool receiveMovie(int soc, char** filename) {
+bool receiveMovie(int soc) {
     struct sockaddr_in sender;
     bool streamReady = false;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
-
-    // set local data file name
-    if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
-    char streamedFilename[strlen(*filename) + 10];
-    snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
-
-    // init packet buffer
-    if (bufInit(streamedFilename) == false) {
-        printf("Error: packet buffer could not be initialized, program stopped\n");
-        return false;
-    }
 
     // create graph file
     FILE* graphDataFile = fopen(GRAPH_DATA_FILE, "w");
@@ -247,19 +236,30 @@ bool receiveMovie(int soc, char** filename) {
     return false;
 }
 
-bool reqFile(int soc, char* filename) {
+bool reqFile(int soc, char** filename) {
     struct sockaddr_in sender;
     unsigned char pkt[4][PKTLEN_MSG];
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
     unsigned int serverAck[4] = {0, 0, 0, 0};
     bool done = false;
+    
+    // set local data file name
+    if (strcmp(*filename, TEST_FILE) == 0) *filename = "random";
+    char streamedFilename[strlen(*filename) + 10];
+    snprintf(streamedFilename, strlen(*filename) + 10, "client_%s", *filename);
+
+    // init packet buffer
+    if (bufInit(streamedFilename) == false) {
+        printf("Error: packet buffer could not be initialized, program stopped\n");
+        return false;
+    }
 
     //create targets and fill request data for all servers
     int i;
     for (i = 0;i < 4;i++) {
         if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-        if (fillpkt(pkt[i], ID_CLIENT, i, TYPE_REQ, 0, (unsigned char*) filename, strlen(filename)) == false) return false; 
+        if (fillpkt(pkt[i], ID_CLIENT, i, TYPE_REQ, 0, (unsigned char*) *filename, strlen(*filename)) == false) return false; 
     }
 
     // send the request and receive a reply
