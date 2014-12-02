@@ -48,7 +48,6 @@ bool readPkt(int soc, struct sockaddr_in* client);
 bool receiveReq(int soc, struct sockaddr_in* client, char** filename);
 bool lookupFile(char* file);
 
-
 /* Function Definitions*/
 int main(int argc, char *argv[]) {
     checkArgs(argc, argv);
@@ -57,7 +56,7 @@ int main(int argc, char *argv[]) {
         printf("Error: UDP socket could not be initialized\n");
         exit(1);
     } else {
-        dprintf("UDP socket intialized, SOCID=%d\n", soc);
+        dprintf("UDP socket initialized, SOCID=%d\n", soc);
     }
     mainLoop(soc);
     return 0;
@@ -77,7 +76,10 @@ void mainLoop(int soc) {
 
     while (errCount < MAX_ERR_COUNT) {
         if (!start) { //waiting for start request
-            if (receiveReq(soc, &client, &filename) == false) continue;
+            if (receiveReq(soc, &client, &filename) == false) {
+                dprintf("File streaming request could not be received, waiting for a next one\n");
+                continue;
+            }
             printf("Request from %s received, file: '%s'\n", inet_ntoa(client.sin_addr), filename);
             printf("Beginning streaming of requested file\n");
             start = true;
@@ -95,10 +97,9 @@ void mainLoop(int soc) {
                     errCount++;
                     continue;
                 default:
-                    printf("Unknown send error occurred, exiting\n");
-                    close(soc);
-                    exit(1);
-                    break;
+                    printf("Unknown send error occurred\n");
+                    errCount++;
+                    continue;
             }
             readPkt(soc, &client);
         }
@@ -137,11 +138,13 @@ int stream(int soc, struct sockaddr_in* client) {
 bool readPkt(int soc, struct sockaddr_in* client) {
     uint32_t misSeq;
     unsigned int size = sizeof (*client);
+    
     int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &size);
     if (rxRes < 0) return false;
     rxRes = checkRxStatus(rxRes, pktIn, serverName);
     if (rxRes == RX_TERMINATED) return false;
     if (rxRes != RX_OK) return false;
+    
     switch (hdrIn->type) {
         case TYPE_FIN: //kill signal
             printf("Got kill signal from client, exiting\n");
@@ -223,6 +226,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     }
     sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
     dprintPkt(pktOut, PKTLEN_MSG, true);
+    
     if (typeOut == TYPE_REQACK) {
         return true;
     } else {
