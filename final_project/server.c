@@ -174,7 +174,8 @@ bool readPkt(int soc, struct sockaddr_in* client) {
         case TYPE_NAK: //missing pkt request
             misSeq = hdrIn->seq;
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
-            sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
+            //TODO DEBUG DOUBLE TAP
+            for (int i = 0;i < 2;i++) sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
             //dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
             //dprintPkt(pktOut, PKTLEN_DATA, true);
             usleep(delayTx); // send delay
