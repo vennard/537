@@ -133,7 +133,6 @@ bool checkRateLost(void) {
     if (lostSeq > 0) dprintf("Sending lost pkt requests:\n");
     while (lostSeq > 0) {
         //dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
-        dprintf("MIS SEQ=%u\n",lostSeq);
 
         //TODO adding better missing packet redirection
         int tthresh = (SPLICE_FRAME / SPLICE_IGNORE_THRESH);
@@ -143,18 +142,16 @@ bool checkRateLost(void) {
         }
         bool selected = false;
         int finalSelection = 0;
-        int j = 0;
         while (!selected) {
-            j++;
             srand(time(NULL));
-            finalSelection = (rand() + j) % 4;
+            finalSelection = (rand() + numMissing) % 4;
             if (selServer[finalSelection] == true) {
-                dprintf("Picked server %i to send missing packet request to\n",finalSelection);
+                //dprintf("Picked server %i to send missing packet request to\n",finalSelection);
                 selected = true;
             }
         }
         int maxServer = finalSelection;
-
+        dprintf("MIS SEQ=%u to S: %i\n",lostSeq,maxServer);
 
 
         /*

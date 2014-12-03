@@ -139,6 +139,7 @@ int stream(int soc, struct sockaddr_in* client) {
     int tseq = getSplice();
     if (tseq == -1) return 0;
 
+    if ((tseq >= 177) && (tseq <= 200)) dprintf("Server entered CRITICAL area: Sending seq %i\n",tseq);
 
     if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, tseq, NULL, 0) == false) return 2;
 
