@@ -1,0 +1,13 @@
+ECE537 ATeam Project Delay Values
+John Vennard & Jan Beran
+Input file: graph_datafile
+R = 10 results in max delay = 75595 ms
+R = 20 results in max delay = 100545 ms
+R = 30 results in max delay = 108862 ms
+R = 40 results in max delay = 113020 ms
+R = 50 results in max delay = 115515 ms
+R = 60 results in max delay = 117179 ms
+R = 70 results in max delay = 118367 ms
+R = 80 results in max delay = 119258 ms
+R = 90 results in max delay = 119951 ms
+R = 100 results in max delay = 120505 ms

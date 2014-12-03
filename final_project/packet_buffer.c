@@ -150,7 +150,7 @@ bool bufFlushFrame(void) {
             lastSeq = 0;
         }
     }
-    dprintf("Reached free cell at index=%d\n, flushing stopped\n", headInd);
+    //dprintf("Reached free cell at index=%d\n, flushing stopped\n", headInd);
     return true;
 }
 
