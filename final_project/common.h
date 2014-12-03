@@ -49,7 +49,7 @@
 #define MAX_FILENAME_LEN 50 // maximum lenght of filenames
 #define TEST_FILE "/dev/urandom"
 #define RATE_STEP 5 // tx rate is changed by this amount (kB/s) when needed
-#define RATE_MAX 32 // maximum intended tx rate per server (kB/s)
+#define RATE_MAX 24 // maximum intended tx rate per server (kB/s)
 
 /*******************
  * Send file defines
@@ -66,7 +66,7 @@
 #define BUF_MIN_OCCUP 0.3   // minimum intended rx buffer occupancy (ratio <0,1>)
 #define BUF_SIZE 1000       // size (pkts) of the packet buffer (in client)
 #define BUF_LOST_THRSH 100  // missing packets older than seq=(newest seq)-LOST_THRSH are considered as lost 
-#define BUF_CHECK_TIME 100000 // time (usecs) between subsequent buffer flushes, rate adjustments, missing packet requests 
+#define BUF_CHECK_TIME 1000000 // time (usecs) between subsequent buffer flushes, rate adjustments, missing packet requests 
 
 /*******************
  * Packet Headers

@@ -169,7 +169,7 @@ bool checkRateLost(void) {
 
         lostSeq = bufGetNextLost();
         numMissing++;
-        return true; //TODO DEBUG TRYING TO ONLY SEND ONE MISSING PKT REQUEST PER TIMER ENTRY
+        //return true; //TODO DEBUG TRYING TO ONLY SEND ONE MISSING PKT REQUEST PER TIMER ENTRY
     }
     dprintf("Total Missing pkts = %i\n",numMissing);
     
@@ -242,8 +242,8 @@ bool receiveMovie(void) {
         if (hdrIn->seq == debugMisSeq) {
             gettimeofday(&tvTest2, NULL);
             unsigned int diffTest = timeDiff(&tvTest1, &tvTest2);
-            printf("WHAAA THE FUCK - GOT THE FIRST MISSING PKT = %i after %i ms\n",debugMisSeq,diffTest);
-            exit(1);
+            printf("GOT THE FIRST MISSING PKT = %i after %i ms\n",debugMisSeq,diffTest);
+            //exit(1);
         }
         
         // add received packet in the buffer
