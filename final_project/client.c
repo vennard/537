@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
         close(soc);
         exit(1);
     } else {
-        printf("File successfully transfered, local copy: client_%s\n", filename);
+        printf("File successfully transmitted, local copy: client_%s\n", filename);
     }
 
     // clean up resources and plot 
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     if (plotGraph() == false) {
         printf("Warning: Graph could not be plotted\n");
     } else {
-        printf("Data successfully calculated: see out.pdf and out.txt\n");
+        printf("Data successfully calculated up to packet %i: see out.pdf and out.txt\n",lastPkt);
     }
 
     return 0;
