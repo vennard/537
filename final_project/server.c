@@ -138,6 +138,7 @@ int stream(int soc, struct sockaddr_in* client) {
         return 2;
     }
     //send delay
+    printf("sleeping for %u usecs\n",delayTx);
     usleep(delayTx);
 
     return 0;
