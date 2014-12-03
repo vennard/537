@@ -13,14 +13,16 @@
  * 4. splice change value does not currently scale with frame size - must check
  */
 
+#define _BSD_SOURCE // for usleep
 #include <signal.h>
+#include <pthread.h>
 #include "common.h"
 #include "packet_buffer.h"
 
 /* Variable Declarations */
 static char *saddr[4]; //server ip addresses
 static struct sockaddr_in server[4];
-static int sock;
+static int soc;
 
 //in/out packet structures
 static unsigned char pktIn[PKTLEN_DATA] = {};
@@ -40,6 +42,7 @@ static bool ackdRatio[4] = {[0 ... 3] = false};
 static int lastPkt = 0;
 static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
 FILE* graphDataFile;
+static pthread_mutex_t bufMutex;
 
 /* Function Declarations */
 char* checkArgs(int argc, char *argv[]);
@@ -48,15 +51,14 @@ void sigintHandler();
 bool spliceTx();
 void spliceAckCheck(int rxLen);
 bool spliceRatio(int rxLen);
-bool reqFile(int soc, char** filename);
-bool receiveMovie(int soc);
+bool reqFile(char** filename);
+bool receiveMovie();
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigintHandler);
     char* filename = checkArgs(argc, argv);
 
-    int soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);
-    sock = soc;
+    soc = udpInit(UDP_PORT + 1, RECV_TIMEOUT);  
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized, program stopped\n");
         exit(1);
@@ -66,7 +68,7 @@ int main(int argc, char *argv[]) {
 
     // start transmission of file
     printf("Requesting file '%s' from servers\n", filename);
-    if (reqFile(soc, &filename) == false) {
+    if (reqFile(&filename) == false) {
         printf("Error: Request failed, program stopped\n");
         close(soc);
         exit(1);
@@ -75,7 +77,7 @@ int main(int argc, char *argv[]) {
     }
 
     // receive movie
-    if (receiveMovie(soc) == false) {
+    if (receiveMovie() == false) {
         printf("Error: Error during the file streaming, program stopped\n");
         close(soc);
         exit(1);
@@ -94,13 +96,96 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-bool receiveMovie(int soc) {
+bool checkRateLost(void) {
+    // adjust tx rates
+    double bufOc = bufGetOccupancy();
+    dprintf("Buffer occupancy OCC=%f\n", bufOc);
+    if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
+        if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
+            currTxRate /= 2;
+            dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
+            // broadcast decrease rate request to all servers
+            for (int i = 0; i < 4; i++) {
+                if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                    return false;
+                }
+                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+                dprintPkt(pktOut, PKTLEN_MSG, true);
+            }
+        } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate * 2 <= RATE_MAX)) {
+            currTxRate *= 2;
+            dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
+            // broadcast increase rate request to all servers
+            for (int i = 0; i < 4; i++) {
+                if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                    return false;
+                }
+                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+                dprintPkt(pktOut, PKTLEN_MSG, true);
+            }
+        }
+    }
+
+    // request lost packets
+    uint32_t lostSeq = bufGetFirstLost();
+    while (lostSeq > 0) {
+        dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
+
+        // send the request to the server with the highest splice ratio
+        int max = 0;
+        int maxServer = 0;
+        int oldVal = sendRatio[0];
+        bool allEqual = true;
+        for (int i = 0; i < 4; i++) {
+            if (sendRatio[i] > max) {
+                max = sendRatio[i];
+                maxServer = i;
+            }
+            if (i > 0) {
+                if (oldVal != sendRatio[i]) allEqual = false;
+                oldVal = sendRatio[i];
+            }
+        }
+        //If all splice ratios are equal send request to random server
+        if (allEqual) {
+            srand(time(NULL));
+            maxServer = rand() % 4;
+        }
+
+        if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
+            return false;
+        }
+        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[maxServer], sizeof (server[maxServer]));
+        dprintPkt(pktOut, PKTLEN_MSG, true);
+
+        lostSeq = bufGetNextLost();
+    }
+    
+    return true;
+}
+
+void* timerProc(void* arg) {   
+    if (arg) arg=NULL; // dummy arg usage
+    while (1) {        
+        usleep(BUF_CHECK_TIME); // sleep 100 ms        
+        pthread_mutex_lock(&bufMutex);
+        bufFlushFrame();        
+        checkRateLost(); // check Lost packets every 10 rounds
+        pthread_mutex_unlock(&bufMutex);
+    }
+}
+
+bool receiveMovie(void) {
     struct sockaddr_in sender;
-    //bool streamReady = false;
     unsigned int senderSize = sizeof (sender);
     unsigned int errCount = 0;
 
-    
+    pthread_mutex_init(&bufMutex, NULL);
+    pthread_t timerThread;
+    if (pthread_create(&timerThread, NULL, &timerProc, NULL) != 0) {
+        printf("Error: Timer could not be created\n");
+        return false;
+    }
 
     while (errCount < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_DATA);
@@ -140,99 +225,14 @@ bool receiveMovie(int soc) {
         lastPkt = hdrIn->seq;
 
         // add received packet in the buffer
+        pthread_mutex_lock(&bufMutex);
         if (bufAdd(hdrIn->seq, payloadIn) == false) {
             printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
         }
+        pthread_mutex_unlock(&bufMutex);
         unsigned int diff = timeDiff(&tvStart, &tvRecv);
         if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
             printf("Warning: Graph data file write error\n");
-        }
-
-        diff = timeDiff(&tvCheck, &tvRecv);
-        if (diff >= 100) {
-            gettimeofday(&tvCheck, NULL);
-
-            /*************************************
-             * TRIGGERED BY THE TIMER (SECTION START)*/
-
-            /*
-            if (streamReady == true || bufGetSubseqCount() >= BUF_BUFFER_PKT) {
-                streamReady = true;
-                // "play" a frame every 10 ms
-                for (unsigned int i = 0; i < diff / 10; i++) {
-                    if (bufFlushFrame() == false) {
-                        // frame missing
-                        return false;
-                    }
-                }
-            }
-            */
-            // adjust tx rates
-            double bufOc = bufGetOccupancy();
-            dprintf("Buffer occupancy OCC=%f\n", bufOc);
-            if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
-                if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
-                    currTxRate /= 2;
-                    dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
-                    // broadcast decrease rate request to all servers
-                    for (int i = 0; i < 4; i++) {
-                        if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
-                            return false;
-                        }
-                        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
-                        dprintPkt(pktOut, PKTLEN_MSG, true);
-                    }
-                } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate * 2 <= RATE_MAX)) {
-                    currTxRate *= 2;
-                    dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
-                    // broadcast increase rate request to all servers
-                    for (int i = 0; i < 4; i++) {
-                        if (fillpkt(pktOut, ID_CLIENT, ID_SERVER1, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
-                            return false;
-                        }
-                        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
-                        dprintPkt(pktOut, PKTLEN_MSG, true);
-                    }
-                }
-            }
-
-            // request lost packets
-            uint32_t lostSeq = bufGetFirstLost();
-            while (lostSeq > 0) {
-                dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
-
-                // send the request to the server with the highest splice ratio
-                int max = 0;
-                int maxServer = 0;
-                int oldVal = sendRatio[0];
-                bool allEqual = true;
-                for (int i = 0; i < 4; i++) {
-                    if (sendRatio[i] > max) {
-                        max = sendRatio[i];
-                        maxServer = i;
-                    }
-                    if (i > 0) {
-                        if (oldVal != sendRatio[i]) allEqual = false;
-                        oldVal = sendRatio[i];
-                    }
-                }
-                //If all splice ratios are equal send request to random server
-                if (allEqual) {
-                    srand(time(NULL));
-                    maxServer = rand() % 4;
-                }
-
-                if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
-                    return false;
-                }
-                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[maxServer], sizeof (server[maxServer]));
-                dprintPkt(pktOut, PKTLEN_MSG, true);
-
-                lostSeq = bufGetNextLost();
-            }
-
-            /* TRIGGERED BY THE TIMER (SECTION END)
-             ***************************************/
         }
     }
 
@@ -242,7 +242,7 @@ bool receiveMovie(int soc) {
     return false;
 }
 
-bool reqFile(int soc, char** filename) {
+bool reqFile(char** filename) {
     struct sockaddr_in sender;
     unsigned char pkt[4][PKTLEN_MSG];
     unsigned int senderSize = sizeof (sender);
@@ -305,9 +305,11 @@ bool reqFile(int soc, char** filename) {
                 //Receive packet before all acks from servers received 
                 if (serverAck[hdrIn->src]) {
                     // add received packet in the buffer
+                    pthread_mutex_lock(&bufMutex);
                     if (bufAdd(hdrIn->seq, payloadIn) == false) {
                         printf("Warning: Buffer write error, SEQ=%u\n", hdrIn->seq);
                     }
+                    pthread_mutex_unlock(&bufMutex);
                     unsigned int diff = timeDiff(&tvStart, &tvRecv);
                     if ((diff == UINT_MAX) || (fprintf(graphDataFile, "%u %u\n", diff, hdrIn->seq) < 0)) {
                         printf("Warning: Graph data file write error\n");
@@ -434,7 +436,7 @@ bool spliceTx() {
         for (i = 0; i < 4; i++) {
             if (fillpktSplice(pktOut, i, seqGap, sendRatio) == false) return false;
             if (initHostStruct(&server[i], saddr[i], UDP_PORT) == false) return false;
-            sendto(sock, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+            sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
         }
     }
     printf("Sent splice ratios!!!\n");
@@ -470,10 +472,10 @@ void sigintHandler() {
         for (i = 0; i < 4; i++) {
             fillpkt(pktOut, ID_CLIENT, i, TYPE_FIN, 0, NULL, 0);
             initHostStruct(&server[i], saddr[i], UDP_PORT);
-            sendto(sock, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+            sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
         }
     }
-    close(sock);
+    close(soc);
     exit(0);
 }
 
