@@ -249,7 +249,8 @@ bool receiveMovie(void) {
 
         //store last sequence number received
         lastPkt = hdrIn->seq;
-
+        if (hdrIn->type != TYPE_DATA) continue; //hotfix
+        
         // add received packet in the buffer
         pthread_mutex_lock(&bufMutex);
         if (bufAdd(hdrIn->seq, payloadIn) == false) {
