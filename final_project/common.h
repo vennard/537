@@ -66,7 +66,7 @@
 #define BUF_MIN_OCCUP 0.3   // minimum intended rx buffer occupancy (ratio <0,1>)
 #define BUF_SIZE 1000       // size (pkts) of the packet buffer (in client)
 #define BUF_LOST_THRSH 100  // missing packets older than seq=(newest seq)-LOST_THRSH are considered as lost 
-#define BUF_CHECK_TIME 1000000 // time (usecs) between subsequent buffer flushes, rate adjustments, missing packet requests 
+#define BUF_CHECK_TIME 10000 // time (usecs) between subsequent buffer flushes, rate adjustments, missing packet requests 
 
 /*******************
  * Packet Headers
