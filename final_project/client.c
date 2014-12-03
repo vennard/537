@@ -53,6 +53,7 @@ void spliceAckCheck(int rxLen);
 bool spliceRatio(int rxLen);
 bool reqFile(char** filename);
 bool receiveMovie();
+bool calcSplice();
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigintHandler);
@@ -333,21 +334,40 @@ bool reqFile(char** filename) {
     return false;
 }
 
+bool calcSplice() {
+    float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
+    float srcRatio[4];
+    for (int i = 0; i < 4; i++) srcRatio[i] = (srcpkts[i] / total);
+    float check = 0;
+    for (int i = 0; i < 4; i++) check += srcRatio[i];
+    dprintf("Src pkts recorded: 1 - %f, 2 - %f, 3 - %f, 4 - %f\nTotal: %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3],total);
+    for (int i = 0; i < 4; i++) srcpkts[i] = 0; //clear packet data
+    if (check != 1) {
+        printf("Error with splice ratio check (= %.6f)\n", check);
+        return false;
+    }
+    for (int i = 0; i < 4; i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
+    return true;
+}
+
 bool spliceRatio(int rxLen) {
     int checkTime, i;
 
     //check for splice acks
     if (!ackdNewRatios) spliceAckCheck(rxLen);
-
-    if (hdrIn->type == TYPE_SPLICE_ACK) return true;
+    //if (hdrIn->type == TYPE_SPLICE_ACK) return true;
 
     //check that packet is of valid type before recording
-    if (hdrIn->type != TYPE_DATA) return false;
-
-    //record where packet came from
-    int src = checkRxSrc(rxLen, pktIn, ID_CLIENT);
-    if ((src < 0) || (src > 3)) return false;
-    srcpkts[src]++;
+    if (hdrIn->type == TYPE_DATA) {
+        //record where packet came from
+        int src = checkRxSrc(rxLen, pktIn, ID_CLIENT);
+        if ((src < 0) || (src > 3)) return false;
+        srcpkts[src]++;
+    } else if (hdrIn->type == TYPE_SPLICE_ACK){
+        return true;
+    } else {
+        return false;
+    }
 
     //timer trigger for splice ratio calculations
     if (!started) {
@@ -360,6 +380,10 @@ bool spliceRatio(int rxLen) {
     }
     if (checkTime > SPLICE_DELAY) {
         gettimeofday(&tvSplice, NULL);
+        if (!calcSplice()) {
+            printf("Error recalculating splice after ack timeout\n");
+        }
+        /*
         float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
         float srcRatio[4];
         for (i = 0; i < 4; i++) srcRatio[i] = (srcpkts[i] / total);
@@ -371,9 +395,9 @@ bool spliceRatio(int rxLen) {
             printf("Error with splice ratio check (= %.6f)\n", check);
             return false;
         }
-        dprintf("Cleared src pkts!! : 1 - %f, 2 - %f, 3 - %f, 4 - %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3]);
         //multiply ratio * SPLICE_FRAME to find final ratio
         for (i = 0; i < 4; i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
+        */
         if (!startedSplice) {
             for (i = 0; i < 4; i++) oldRatio[i] = sendRatio[i];
             startedSplice = true;
@@ -382,7 +406,7 @@ bool spliceRatio(int rxLen) {
             int change = 0;
             for (i = 0; i < 4; i++) change += abs(sendRatio[i] - oldRatio[i]); //TODO must scale with frame size
             for (i = 0; i < 4; i++) oldRatio[i] = sendRatio[i];
-            dprintf("Splice Check: #pkts = %f, time = %i, ratios:\n", total, checkTime);
+            dprintf("Splice Check: time = %i, ratios:\n", checkTime);
             for (i = 0; i < 4; i++) printf("%i: %i\n", i, sendRatio[i]);
             dprintf("change value: %i\n", change);
             if ((change >= SPLICE_THRESH)&&(ackdNewRatios)) {
@@ -403,6 +427,9 @@ void spliceAckCheck(int rxLen) {
     if (check > (SPLICE_DELAY / 8)) { //TODO mess with this timiing - important
         printf("Warning: Splice ack timeout, resending ratios\n");
         gettimeofday(&tvSplice, NULL);
+        if (!calcSplice()) { //recalculate splice ratios on timeout
+            printf("Error recalculating splice after ack timeout\n");
+        }
         if (!spliceTx()) {
             printf("Error: Failed to resend splice ratios\n");
         }
