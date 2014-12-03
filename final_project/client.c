@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     if (plotGraph() == false) {
         printf("Warning: Graph could not be plotted\n");
     } else {
-        dprintf("RX packet rate graph: '%s', raw data: '%s'\n", GRAPH_OUTPUT_FILE, GRAPH_DATA_FILE);
+        printf("Data successfully calculated: see out.pdf and out.txt\n");
     }
 
     return 0;
@@ -445,7 +445,7 @@ bool spliceTx() {
 }
 
 bool plotGraph(void) {
-    char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + strlen(GRAPH_OUTPUT_FILE) + 10];
+    char cmd[strlen(GRAPH_DATA_FILE) + strlen(GNUPLOT_SCRIPT) + 10];
 
     // set gnuplot script permissions
     snprintf(cmd, sizeof (cmd), "chmod +x %s", GNUPLOT_SCRIPT);
@@ -454,7 +454,7 @@ bool plotGraph(void) {
     }
 
     // execute the script
-    snprintf(cmd, sizeof (cmd), "./%s %s %s", GNUPLOT_SCRIPT, GRAPH_DATA_FILE, GRAPH_OUTPUT_FILE);
+    snprintf(cmd, sizeof (cmd), "./%s %s", GNUPLOT_SCRIPT, GRAPH_DATA_FILE);
     if (system(cmd) != 0) {
         return false;
     }
@@ -462,7 +462,6 @@ bool plotGraph(void) {
 }
 
 //signal handler to catch ctrl+c exit
-
 void sigintHandler() {
     signal(SIGINT, sigintHandler);
     printf("\nShutting down streaming service...\n");

@@ -141,9 +141,7 @@ typedef struct pkthdr_spl {
  * Graph plotting defines
  *******************/
 #define GRAPH_DATA_FILE "graph_datafile"
-#define GNUPLOT_SCRIPT "graph_plot.sh"
-#define GRAPH_OUTPUT_FILE "graph.png"
-
+#define GNUPLOT_SCRIPT "plot.sh"
 
 /*******************
  * Functions
