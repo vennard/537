@@ -169,6 +169,7 @@ bool checkRateLost(void) {
 
         lostSeq = bufGetNextLost();
         numMissing++;
+        return true; //TODO DEBUG TRYING TO ONLY SEND ONE MISSING PKT REQUEST PER TIMER ENTRY
     }
     dprintf("Total Missing pkts = %i\n",numMissing);
     
