@@ -176,8 +176,8 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
             //TODO DEBUG DOUBLE TAP
             for (int i = 0;i < 2;i++) sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
-            //dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
-            //dprintPkt(pktOut, PKTLEN_DATA, true);
+            dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
+            dprintPkt(pktOut, PKTLEN_DATA, true);
             usleep(delayTx); // send delay
             break;
         case TYPE_SPLICE: //new splice ratio
@@ -191,7 +191,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             printf("Read packet of incorrect type, continuing\n");
             return false;
     }
-    return true;
+    return false;
 }
 
 /* reads new splice ratio from client and handles data accordingly*/
