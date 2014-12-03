@@ -32,7 +32,7 @@ static unsigned char* payloadIn = pktIn + HDRLEN;
 
 //rate calculations, splice variables and timers
 static struct timeval tvStart, tvRecv, tvCheck, tvSplice, tvSpliceAck;
-static float srcpkts[4] = {};
+float srcpkts[4] = {};
 static uint8_t sendRatio[4] = {};
 static int oldRatio[4] = {}; //holds old ratios to check threshold for change
 bool started = false;
@@ -364,12 +364,13 @@ bool spliceRatio(int rxLen) {
         for (i = 0; i < 4; i++) srcRatio[i] = (srcpkts[i] / total);
         float check = 0;
         for (i = 0; i < 4; i++) check += srcRatio[i];
+        dprintf("Src pkts recorded: 1 - %f, 2 - %f, 3 - %f, 4 - %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3]);
         for (i = 0; i < 4; i++) srcpkts[i] = 0; //clear packet data
         if (check != 1) {
             printf("Error with splice ratio check (= %.6f)\n", check);
             return false;
         }
-        dprintf("Src pkts recorded: 1 - %f, 2 - %f, 3 - %f, 4 - %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3]);
+        dprintf("Cleared src pkts!! : 1 - %f, 2 - %f, 3 - %f, 4 - %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3]);
         //multiply ratio * SPLICE_FRAME to find final ratio
         for (i = 0; i < 4; i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
         if (!startedSplice) {
