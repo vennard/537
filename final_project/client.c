@@ -170,7 +170,7 @@ void* timerProc(void* arg) {
         usleep(BUF_CHECK_TIME); // sleep 100 ms        
         pthread_mutex_lock(&bufMutex);
         bufFlushFrame();        
-        checkRateLost(); // check Lost packets every 10 rounds
+        checkRateLost(); // check Lost packets every 10 rounds TODO slow down this check need to allow time for packet to be recieved
         pthread_mutex_unlock(&bufMutex);
     }
 }
@@ -369,6 +369,7 @@ bool spliceRatio(int rxLen) {
             printf("Error with splice ratio check (= %.6f)\n", check);
             return false;
         }
+        dprintf("Src pkts recorded: 1 - %i, 2 - %i, 3 - %i, 4 - %i\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3]);
         //multiply ratio * SPLICE_FRAME to find final ratio
         for (i = 0; i < 4; i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
         if (!startedSplice) {
@@ -379,11 +380,9 @@ bool spliceRatio(int rxLen) {
             int change = 0;
             for (i = 0; i < 4; i++) change += abs(sendRatio[i] - oldRatio[i]); //TODO must scale with frame size
             for (i = 0; i < 4; i++) oldRatio[i] = sendRatio[i];
-            if (1) {
-                printf("Splice Check: #pkts = %f, time = %i, ratios:\n", total, checkTime);
-                for (i = 0; i < 4; i++) printf("%i: %i\n", i, sendRatio[i]);
-                printf("change value: %i\n", change);
-            }
+            dprintf("Splice Check: #pkts = %f, time = %i, ratios:\n", total, checkTime);
+            for (i = 0; i < 4; i++) printf("%i: %i\n", i, sendRatio[i]);
+            dprintf("change value: %i\n", change);
             if ((change >= SPLICE_THRESH)&&(ackdNewRatios)) {
                 //send ratio to servers
                 printf("Change (%i) exceeded at time %i, sending new splice ratios\n", change, checkTime);

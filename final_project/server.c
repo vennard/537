@@ -116,7 +116,7 @@ int stream(int soc, struct sockaddr_in* client) {
     //check end condition
     if (seq > EMPTY_PKT_COUNT) {
         if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_FIN, 0, NULL, 0) == false) return 2;
-        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof(*client));
+        for (int i =0; i < 2;i++) sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof(*client));
         return 1;
     }
 
