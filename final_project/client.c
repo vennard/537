@@ -103,8 +103,8 @@ bool checkRateLost(void) {
     // adjust tx rates
     double bufOc = bufGetOccupancy();
     if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
-        dprintf("IF bufOc = %f >  %f AND currTxRate = %i >= 2\n",bufOc,BUF_MAX_OCCUP,currTxRate);
-        dprintf("ELSE bufOc = %f <  %f AND currTxRate * 2 = %i <= RATE_MAX %i \n",bufOc,BUF_MIN_OCCUP,currTxRate*2,RATE_MAX);
+        //dprintf("IF bufOc = %f >  %f AND currTxRate = %i >= 2\n",bufOc,BUF_MAX_OCCUP,currTxRate);
+        //dprintf("ELSE bufOc = %f <  %f AND currTxRate * 2 = %i <= RATE_MAX %i \n",bufOc,BUF_MIN_OCCUP,currTxRate*2,RATE_MAX);
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
             currTxRate /= 2; dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
             // broadcast decrease rate request to all servers
