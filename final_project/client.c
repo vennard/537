@@ -19,6 +19,7 @@
 #include "common.h"
 #include "packet_buffer.h"
 
+    unsigned int debugMisSeq = 0;
 /* Variable Declarations */
 static char *saddr[4]; //server ip addresses
 static struct sockaddr_in server[4];
@@ -154,6 +155,8 @@ bool checkRateLost(void) {
         }
         int maxServer = finalSelection;
         dprintf("MIS SEQ=%u to S: %i\n",lostSeq,maxServer);
+        if (debugMisSeq == 0) debugMisSeq = lostSeq;
+
 
         if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, lostSeq, NULL, 0) == false) {
             return false;
@@ -230,6 +233,9 @@ bool receiveMovie(void) {
         //store last sequence number received
         lastPkt = hdrIn->seq;
         if (hdrIn->type != TYPE_DATA) continue; //hotfix
+
+        //DEBUG check missing pkt
+        if (hdrIn->seq == debugMisSeq) printf("WHAAA THE F - GOT THE FIRST MISSING PKT = %i\n",debugMisSeq);
         
         // add received packet in the buffer
         pthread_mutex_lock(&bufMutex);
