@@ -1,0 +1,22 @@
+cket: TYPE=DATA, SRC=1, DST=8, SEQ=33, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=36
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=36, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=33
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=33, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=36
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=36, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=33
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=33, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=33
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=33, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=33
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=33, SIZE=1032
+Rx packet: TYPE=NAK, SRC=8, DST=1, SEQ=0, SIZE=128
+Missing pkt request: SEQ=36
+Tx packet: TYPE=DATA, SRC=1, DST=8, SEQ=36, SIZE=103
