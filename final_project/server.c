@@ -160,7 +160,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             exit(0);
             break;
         case TYPE_NAK: //missing pkt request
-            misSeq = (uint32_t) * payloadIn;
+            misSeq = hdrIn->seq;
             dprintf("Missing pkt request: SEQ=%u\n", misSeq);
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
             sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
