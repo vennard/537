@@ -153,30 +153,6 @@ bool checkRateLost(void) {
         int maxServer = finalSelection;
         dprintf("MIS SEQ=%u to S: %i\n",lostSeq,maxServer);
 
-
-        /*
-        // send the request to the server with the highest splice ratio
-        int max = 0;
-        int maxServer = 0;
-        int oldVal = sendRatio[0];
-        bool allEqual = true;
-        for (int i = 0; i < 4; i++) {
-            if (sendRatio[i] > max) {
-                max = sendRatio[i];
-                maxServer = i;
-            }
-            if (i > 0) {
-                if (oldVal != sendRatio[i]) allEqual = false;
-                oldVal = sendRatio[i];
-            }
-        }
-        //If all splice ratios are equal send request to random server
-        if (allEqual) {
-            srand(time(NULL));
-            maxServer = rand() % 4;
-        }
-        */
-
         if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, lostSeq, NULL, 0) == false) {
             return false;
         }
@@ -217,8 +193,8 @@ bool receiveMovie(void) {
 
     while (errCount < MAX_ERR_COUNT) {
         memset(pktIn, 0, PKTLEN_DATA);
-        int rxLen = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
         gettimeofday(&tvRecv, NULL);
+        int rxLen = recvfrom(soc, pktIn, PKTLEN_DATA, 0, (struct sockaddr*) &sender, &senderSize);
 
         int rxRes = checkRxStatus(rxLen, pktIn, ID_CLIENT);
         if (rxRes == RX_TERMINATED) {

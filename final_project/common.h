@@ -49,7 +49,7 @@
 #define MAX_FILENAME_LEN 50 // maximum lenght of filenames
 #define TEST_FILE "/dev/urandom"
 #define RATE_STEP 5 // tx rate is changed by this amount (kB/s) when needed
-#define RATE_MAX 16 // maximum intended tx rate per server (kB/s)
+#define RATE_MAX 10 // maximum intended tx rate per server (kB/s)
 
 /*******************
  * Send file defines
