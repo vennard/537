@@ -152,7 +152,7 @@ bool checkRateLost(void) {
             maxServer = rand() % 4;
         }
 
-        if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, 0, (unsigned char*) &lostSeq, sizeof (lostSeq)) == false) {
+        if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, lostSeq, NULL, 0) == false) {
             return false;
         }
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[maxServer], sizeof (server[maxServer]));
