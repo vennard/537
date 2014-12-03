@@ -68,6 +68,7 @@ void mainLoop(int soc) {
     char* filename;
     bool start = false;
     delayTx = rateToDelay(RATE_MAX);
+    printf("Initial Delay %i ms\n",delayTx);
 
     dprintf("Initial Splice Ratios:");
     for (i = 0; i < 4; i++) dprintf(" %i ", spliceRatios[i]);
@@ -183,6 +184,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             break;
         case TYPE_RATE:
             printf("Got rate change request to %u\n",hdrIn->seq);
+            delayTx = rateToDelay(hdrIn->seq);
             break;
         default:
             printf("Read packet of incorrect type, continuing\n");
