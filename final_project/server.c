@@ -95,7 +95,7 @@ void mainLoop(int soc) {
             opts = (opts | O_NONBLOCK);
             fcntl(soc, F_SETFL, opts);
         } else { //streaming file
-            while (readPkt(soc, &client) != false) {};
+            while (readPkt(soc, &client)) {};
             switch (stream(soc, &client)) {
                 case 0: //pkt sent successfully
                     break;
@@ -173,9 +173,9 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             break;
         case TYPE_NAK: //missing pkt request
             misSeq = hdrIn->seq;
-            dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
             sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
+            dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
             dprintPkt(pktOut, PKTLEN_DATA, true);
             //usleep(delayTx); // send delay
             break;
@@ -190,7 +190,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             printf("Read packet of incorrect type, continuing\n");
             return false;
     }
-    return true;
+    return false;
 }
 
 /* reads new splice ratio from client and handles data accordingly*/
