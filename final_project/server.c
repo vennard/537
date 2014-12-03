@@ -93,7 +93,8 @@ void mainLoop(int soc) {
             opts = fcntl(soc, F_GETFL);
             opts = (opts | O_NONBLOCK);
             fcntl(soc, F_SETFL, opts);
-        } else { //streaming file            
+        } else { //streaming file
+            while (readPkt(soc, &client) != false) {};
             switch (stream(soc, &client)) {
                 case 0: //pkt sent successfully
                     break;
@@ -111,7 +112,6 @@ void mainLoop(int soc) {
                     errCount++;
                     continue;
             }
-            readPkt(soc, &client);
         }
     }
     printf("Server exceeded error limit of %i, exiting\n", MAX_ERR_COUNT);
@@ -175,6 +175,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
             sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
             dprintPkt(pktOut, PKTLEN_DATA, true);
+            usleep(delayTx); // send delay
             break;
         case TYPE_SPLICE: //new splice ratio
             rxSplice(soc, client);
