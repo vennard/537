@@ -20,6 +20,7 @@
 #include "packet_buffer.h"
 
     unsigned int debugMisSeq = 0;
+    struct timeval tvTest1, tvTest2;
 /* Variable Declarations */
 static char *saddr[4]; //server ip addresses
 static struct sockaddr_in server[4];
@@ -105,8 +106,7 @@ bool checkRateLost(void) {
         dprintf("IF bufOc = %f >  %f AND currTxRate = %i >= 2\n",bufOc,BUF_MAX_OCCUP,currTxRate);
         dprintf("ELSE bufOc = %f <  %f AND currTxRate * 2 = %i <= RATE_MAX %i \n",bufOc,BUF_MIN_OCCUP,currTxRate*2,RATE_MAX);
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
-            currTxRate /= 2;
-            dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
+            currTxRate /= 2; dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
             // broadcast decrease rate request to all servers
             for (int i = 0; i < 4; i++) {
                 if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, currTxRate, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
@@ -155,7 +155,10 @@ bool checkRateLost(void) {
         }
         int maxServer = finalSelection;
         dprintf("MIS SEQ=%u to S: %i\n",lostSeq,maxServer);
-        if (debugMisSeq == 0) debugMisSeq = lostSeq;
+        if (debugMisSeq == 0) {
+            debugMisSeq = lostSeq;
+            gettimeofday(&tvTest1, NULL);
+        }
 
 
         if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, lostSeq, NULL, 0) == false) {
@@ -235,7 +238,12 @@ bool receiveMovie(void) {
         if (hdrIn->type != TYPE_DATA) continue; //hotfix
 
         //DEBUG check missing pkt
-        if (hdrIn->seq == debugMisSeq) printf("WHAAA THE F - GOT THE FIRST MISSING PKT = %i\n",debugMisSeq);
+        if (hdrIn->seq == debugMisSeq) {
+            gettimeofday(&tvTest2, NULL);
+            unsigned int diffTest = timeDiff(&tvTest1, &tvTest2);
+            printf("WHAAA THE FUCK - GOT THE FIRST MISSING PKT = %i after %i ms\n",debugMisSeq,diffTest);
+            exit(1);
+        }
         
         // add received packet in the buffer
         pthread_mutex_lock(&bufMutex);
