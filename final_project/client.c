@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
 bool checkRateLost(void) {
     // adjust tx rates
     double bufOc = bufGetOccupancy();
-    //dprintf("Buffer occupancy OCC=%f\n", bufOc);
+    dprintf("OCC=%f > %f OR OCC=%f < %f\n",bufOc,BUF_MAX_OCCUP,bufOc,BUF_MIN_OCCUP);
     if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
             currTxRate /= 2;
