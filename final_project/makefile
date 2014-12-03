@@ -2,7 +2,7 @@
 # Early version - use only as framework example
 
 CC= gcc
-CFLAGS= -std=c99 -Wall -Wextra -Werror
+CFLAGS= -std=c99 -Wall -Wextra -Werror -pthread
 
 all: CFLAGS += -DDEBUG=0
 all: server client 

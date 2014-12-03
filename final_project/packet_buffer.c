@@ -132,29 +132,25 @@ unsigned int bufGetSubseqCount(void) {
 bool bufFlushFrame(void) {
     if (!initialized) return false;
 
-    // check if there is a packet at the beginning of the buffer
-    if (buf[headInd].isFree == true) {
-        printf("Error: Missing frame to be played, cannot continue streaming, expected seq=%u\n", headSeq);
-        return false;
-    }
+    while (buf[headInd].isFree == false) {
+        // flush the packet
+        if (out != NULL) {
+            if (fwrite(buf[headInd].data, 1, DATALEN, out) != (DATALEN)) {
+                printf("Warning: local data file write error\n");
+            }
+        }
+        dprintf("Packet flushed from the buffer, seq=%u index=%d\n", buf[headInd].seq, headInd);
 
-    // flush the packet
-    if (out != NULL) {
-        if (fwrite(buf[headInd].data, 1, DATALEN, out) != (DATALEN)) {
-            printf("Warning: local data file write error\n");
+        // update the buffer head
+        buf[headInd].isFree = true;
+        headInd = (headInd + 1) % BUF_SIZE;
+        headSeq++;
+        if (lastSeq < headSeq) {
+            // buffer is empty
+            lastSeq = 0;
         }
     }
-    dprintf("Packet flushed from the buffer, seq=%u index=%d\n", buf[headInd].seq, headInd);
-
-    // update the buffer head
-    buf[headInd].isFree = true;
-    headInd = (headInd + 1) % BUF_SIZE;
-    headSeq++;
-    if (lastSeq < headSeq) {
-        // buffer is empty
-        lastSeq = 0;
-    }
-
+    dprintf("Reached free cell at index=%d\n, flushing stopped\n", headInd);
     return true;
 }
 
