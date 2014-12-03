@@ -100,8 +100,8 @@ int main(int argc, char *argv[]) {
 bool checkRateLost(void) {
     // adjust tx rates
     double bufOc = bufGetOccupancy();
-    dprintf("OCC=%f > %f OR OCC=%f < %f\n",bufOc,BUF_MAX_OCCUP,bufOc,BUF_MIN_OCCUP);
     if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
+        dprintf("IF bufOc = %f >  %f AND currTxRate = %i >= 2\n",bufOc,BUF_MAX_OCCUP,currTxRate);
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
             currTxRate /= 2;
             dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
@@ -113,6 +113,7 @@ bool checkRateLost(void) {
                 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
                 dprintPkt(pktOut, PKTLEN_MSG, true);
             }
+        dprintf("ELSE bufOc = %f <  %f AND currTxRate * 2 = %i <= RATE_MAX %i \n",bufOc,BUF_MIN_OCCUP,currTxRate*2,RATE_MAX);
         } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate * 2 <= RATE_MAX)) {
             currTxRate *= 2;
             dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
