@@ -140,9 +140,11 @@ bool checkRateLost(void) {
         }
         bool selected = false;
         int finalSelection = 0;
+        int j = 0;
         while (!selected) {
+            j++;
             srand(time(NULL));
-            finalSelection = rand() % 4;
+            finalSelection = (rand() + j) % 4;
             if (selServer[finalSelection] == true) {
                 dprintf("Picked server %i to send missing packet request to\n",finalSelection);
                 selected = true;
