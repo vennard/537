@@ -129,8 +129,11 @@ bool checkRateLost(void) {
 
     // request lost packets
     uint32_t lostSeq = bufGetFirstLost();
+    int numMissing = 0;
+    if (lostSeq > 0) dprintf("Sending lost pkt requests:\n");
     while (lostSeq > 0) {
-        dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
+        //dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
+        dprintf("MIS SEQ=%u\n",lostSeq);
 
         //TODO adding better missing packet redirection
         int tthresh = (SPLICE_FRAME / SPLICE_IGNORE_THRESH);
@@ -184,7 +187,9 @@ bool checkRateLost(void) {
         dprintPkt(pktOut, PKTLEN_MSG, true);
 
         lostSeq = bufGetNextLost();
+        numMissing++;
     }
+    dprintf("Total Missing pkts = %i\n",numMissing);
     
     return true;
 }
