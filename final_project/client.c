@@ -354,8 +354,7 @@ bool calcSplice() {
     dprintf("Src pkts recorded: 1 - %f, 2 - %f, 3 - %f, 4 - %f\nTotal: %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3],total);
     for (int i = 0; i < 4; i++) srcpkts[i] = 0; //clear packet data
     if (check != 1) {
-        printf("Error with splice ratio check (= %.6f)\n", check);
-        return false;
+        printf("Error with splice ratio check (= %.10f)\n", check);
     }
     for (int i = 0; i < 4; i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
     return true;

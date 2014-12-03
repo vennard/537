@@ -177,7 +177,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
             sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
             dprintPkt(pktOut, PKTLEN_DATA, true);
-            usleep(delayTx); // send delay
+            //usleep(delayTx); // send delay
             break;
         case TYPE_SPLICE: //new splice ratio
             rxSplice(soc, client);
