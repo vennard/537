@@ -181,12 +181,12 @@ uint32_t bufGetNextLost(void) {
         ind = (headInd + (lastReqSeq - headSeq + 1)) % BUF_SIZE;
     }
 
-    unsigned int count = 0; // packet counter
+    unsigned int count = 1; // packet counter
     while (count < (pktCount - BUF_LOST_THRSH)) {
         if (buf[ind].isFree == true) {
             // lost packet detected
-            lastReqSeq = headSeq + count; // remember its seq
-            return (headSeq + count); // request it
+            lastReqSeq += count; // remember its seq
+            return lastReqSeq; // request it
         }
         count++;
         ind = (ind + 1) % BUF_SIZE;
