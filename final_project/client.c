@@ -132,6 +132,27 @@ bool checkRateLost(void) {
     while (lostSeq > 0) {
         dprintf("Detected lost packet, SEQ=%u\n", lostSeq);
 
+        //TODO adding better missing packet redirection
+        int tthresh = (SPLICE_FRAME / SPLICE_IGNORE_THRESH);
+        bool selServer[4] = {[0 ... 3] = true};
+        for (int i = 0; i < 4; i++) {
+            if (sendRatio[i] < tthresh) selServer[i] = false; 
+        }
+        bool selected = false;
+        int finalSelection = 0;
+        while (!selected) {
+            srand(time(NULL));
+            finalSelection = rand() % 4;
+            if (selServer[finalSelection] == true) {
+                dprintf("Picked server %i to send missing packet request to\n",finalSelection);
+                selected = true;
+            }
+        }
+        int maxServer = finalSelection;
+
+
+
+        /*
         // send the request to the server with the highest splice ratio
         int max = 0;
         int maxServer = 0;
@@ -152,6 +173,7 @@ bool checkRateLost(void) {
             srand(time(NULL));
             maxServer = rand() % 4;
         }
+        */
 
         if (fillpkt(pktOut, ID_CLIENT, maxServer, TYPE_NAK, lostSeq, NULL, 0) == false) {
             return false;
