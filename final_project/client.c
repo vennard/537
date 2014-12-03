@@ -108,7 +108,8 @@ bool checkRateLost(void) {
             dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
             // broadcast decrease rate request to all servers
             for (int i = 0; i < 4; i++) {
-                if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, currTxRate, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
+                //if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, 0, (unsigned char*) &currTxRate, sizeof (unsigned int)) == false) {
                     return false;
                 }
                 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
