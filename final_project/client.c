@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
 bool checkRateLost(void) {
     // adjust tx rates
     double bufOc = bufGetOccupancy();
-    dprintf("Buffer occupancy OCC=%f\n", bufOc);
+    //dprintf("Buffer occupancy OCC=%f\n", bufOc);
     if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
             currTxRate /= 2;
@@ -421,7 +421,7 @@ void spliceAckCheck(int rxLen) {
     //check for all four acks
     ackdNewRatios = true;
     for (i = 0; i < 4; i++) if (!ackdRatio[i]) ackdNewRatios = false;
-    if (ackdNewRatios) printf("Splice ack success! Got all 4 acks\n");
+    if (ackdNewRatios) dprintf("Splice ack success! Got all 4 acks\n");
 }
 
 bool spliceTx() {
@@ -438,7 +438,7 @@ bool spliceTx() {
             sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
         }
     }
-    printf("Sent splice ratios!!!\n");
+    dprintf("Sent splice ratios!!!\n");
     gettimeofday(&tvSpliceAck, NULL);
     return true;
 }
