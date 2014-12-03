@@ -169,8 +169,9 @@ void* timerProc(void* arg) {
     while (1) {        
         usleep(BUF_CHECK_TIME); // sleep 100 ms        
         pthread_mutex_lock(&bufMutex);
+        printf("New timer round\n");
         bufFlushFrame();        
-        checkRateLost(); // check Lost packets every 10 rounds TODO slow down this check need to allow time for packet to be recieved
+        checkRateLost(); // check Lost packets TODO slow down this check need to allow time for packet to be recieved
         pthread_mutex_unlock(&bufMutex);
     }
 }
