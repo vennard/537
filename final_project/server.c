@@ -51,7 +51,7 @@ bool lookupFile(char* file);
 /* Function Definitions*/
 int main(int argc, char *argv[]) {
     checkArgs(argc, argv);
-    int soc = udpInit(UDP_PORT, 1); //initialize port non-blocking 
+    int soc = udpInit(UDP_PORT, 0);
     if (soc == -1) {
         printf("Error: UDP socket could not be initialized\n");
         exit(1);
@@ -76,6 +76,11 @@ void mainLoop(int soc) {
 
     while (errCount < MAX_ERR_COUNT) {
         if (!start) { //waiting for start request
+            // set socket to blocking mode
+            int opts = fcntl(soc, F_GETFL);
+            opts = opts & (~O_NONBLOCK);
+            fcntl(soc, F_SETFL, opts);
+
             if (receiveReq(soc, &client, &filename) == false) {
                 dprintf("File streaming request could not be received, waiting for a next one\n");
                 continue;
@@ -83,7 +88,12 @@ void mainLoop(int soc) {
             printf("Request from %s received, file: '%s'\n", inet_ntoa(client.sin_addr), filename);
             printf("Beginning streaming of requested file\n");
             start = true;
-        } else { //streaming file
+
+            // set socket to non-blocking mode
+            opts = fcntl(soc, F_GETFL);
+            opts = (opts | O_NONBLOCK);
+            fcntl(soc, F_SETFL, opts);
+        } else { //streaming file            
             switch (stream(soc, &client)) {
                 case 0: //pkt sent successfully
                     break;
@@ -116,7 +126,7 @@ int stream(int soc, struct sockaddr_in* client) {
     //check end condition
     if (seq > EMPTY_PKT_COUNT) {
         if (fillpkt(pktOut, serverName, ID_CLIENT, TYPE_FIN, 0, NULL, 0) == false) return 2;
-        for (int i =0; i < 2;i++) sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof(*client));
+        for (int i = 0; i < 2; i++) sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
         return 1;
     }
 
@@ -138,7 +148,6 @@ int stream(int soc, struct sockaddr_in* client) {
         return 2;
     }
     //send delay
-    printf("sleeping for %u usecs\n",delayTx);
     usleep(delayTx);
 
     return 0;
@@ -147,13 +156,13 @@ int stream(int soc, struct sockaddr_in* client) {
 bool readPkt(int soc, struct sockaddr_in* client) {
     uint32_t misSeq;
     unsigned int size = sizeof (*client);
-    
+
     int rxRes = recvfrom(soc, pktIn, PKTLEN_MSG, 0, (struct sockaddr*) client, &size);
     if (rxRes < 0) return false;
     rxRes = checkRxStatus(rxRes, pktIn, serverName);
     if (rxRes == RX_TERMINATED) return false;
     if (rxRes != RX_OK) return false;
-    
+
     switch (hdrIn->type) {
         case TYPE_FIN: //kill signal
             printf("Got kill signal from client, exiting\n");
@@ -235,7 +244,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
     }
     sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
     dprintPkt(pktOut, PKTLEN_MSG, true);
-    
+
     if (typeOut == TYPE_REQACK) {
         return true;
     } else {
