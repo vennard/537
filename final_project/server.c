@@ -181,6 +181,9 @@ bool readPkt(int soc, struct sockaddr_in* client) {
         case TYPE_SPLICE: //new splice ratio
             rxSplice(soc, client);
             break;
+        case TYPE_RATE:
+            printf("Got rate change request to %u\n",hdrIn->seq);
+            break;
         default:
             printf("Read packet of incorrect type, continuing\n");
             return false;
