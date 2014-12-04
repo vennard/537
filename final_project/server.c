@@ -176,7 +176,7 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             fillpkt(pktOut, serverName, ID_CLIENT, TYPE_DATA, misSeq, NULL, 0);
             sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
             dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
-            dprintPkt(pktOut, PKTLEN_DATA, true);
+            //dprintPkt(pktOut, PKTLEN_DATA, true);
             usleep(rateToDelay(RATE_MAX));
             //usleep(delayTx); // send delay
             break;
@@ -253,7 +253,7 @@ bool receiveReq(int soc, struct sockaddr_in* client, char** filename) {
         return false;
     }
     sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) client, sizeof (*client));
-    dprintPkt(pktOut, PKTLEN_MSG, true);
+    //dprintPkt(pktOut, PKTLEN_MSG, true);
 
     if (typeOut == TYPE_REQACK) {
         return true;

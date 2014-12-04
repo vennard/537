@@ -106,7 +106,7 @@ int checkRxStatus(int rxRes, unsigned char* pkt, uint8_t expDst) {
     }
 
     // print the debug info
-    dprintPkt(pkt, rxRes, false);
+    //dprintPkt(pkt, rxRes, false);
 
     pkthdr_common* hdr = (pkthdr_common*) pkt;
     if (((rxRes != PKTLEN_DATA) && (rxRes != PKTLEN_MSG)) ||
@@ -206,6 +206,7 @@ bool fillpkt(
     return true;
 }
 
+    /*
 void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
     if (!DEBUG) {
         return;
@@ -213,7 +214,7 @@ void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
 
     pkthdr_common* hdr = (pkthdr_common*) pkt;
     char* typeStr;
-    char* dirStr;
+    //char* dirStr;
 
     switch (hdr->type) {
         case TYPE_REQ:
@@ -256,6 +257,7 @@ void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
     //dprintf("%s packet: TYPE=%s, SRC=%u, DST=%u, SEQ=%u, SIZE=%u\n",
      //       dirStr, typeStr, hdr->src, hdr->dst, hdr->seq, pktLen);
 }
+     */
 
 unsigned int rateToDelay(unsigned int rate) {    
     return 1000000 / rate;

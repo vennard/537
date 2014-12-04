@@ -197,7 +197,7 @@ bool checkRateLost(void) { // adjust tx rates
             return false;
         }
         sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[maxServer], sizeof (server[maxServer]));
-        dprintPkt(pktOut, PKTLEN_MSG, true);
+        //dprintPkt(pktOut, PKTLEN_MSG, true);
 
         lostSeq = bufGetNextLost();
         numMissing++;
