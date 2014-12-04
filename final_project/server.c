@@ -177,14 +177,17 @@ bool readPkt(int soc, struct sockaddr_in* client) {
             sendto(soc, pktOut, PKTLEN_DATA, 0, (struct sockaddr*) client, sizeof (*client));
             dprintf("(seq = %i) Missing pkt request: SEQ=%u\n",seq, misSeq);
             dprintPkt(pktOut, PKTLEN_DATA, true);
-            usleep(delayTx); // send delay
+            usleep(rateToDelay(RATE_MAX));
+            //usleep(delayTx); // send delay
             break;
         case TYPE_SPLICE: //new splice ratio
             rxSplice(soc, client);
+            return false;
             break;
         case TYPE_RATE:
             printf("Got rate change request to %u\n",hdrIn->seq);
             delayTx = rateToDelay(hdrIn->seq);
+            return false;
             break;
         default:
             printf("Read packet of incorrect type, continuing\n");
@@ -214,7 +217,7 @@ bool rxSplice(int soc, struct sockaddr_in* client) {
 
     //check valid sequence number
     if (sseq <= seq) {
-        printf("Error: sseq number below current seq number\n");
+        printf("ERROR: sseq number below current seq number\n");
         return false;
     }
 

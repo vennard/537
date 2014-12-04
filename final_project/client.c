@@ -400,21 +400,6 @@ bool spliceRatio(int rxLen) {
         if (!calcSplice()) {
             printf("Error recalculating splice after ack timeout\n");
         }
-        /*
-        float total = srcpkts[0] + srcpkts[1] + srcpkts[2] + srcpkts[3];
-        float srcRatio[4];
-        for (i = 0; i < 4; i++) srcRatio[i] = (srcpkts[i] / total);
-        float check = 0;
-        for (i = 0; i < 4; i++) check += srcRatio[i];
-        dprintf("Src pkts recorded: 1 - %f, 2 - %f, 3 - %f, 4 - %f\n",srcpkts[0],srcpkts[1],srcpkts[2],srcpkts[3]);
-        for (i = 0; i < 4; i++) srcpkts[i] = 0; //clear packet data
-        if (check != 1) {
-            printf("Error with splice ratio check (= %.6f)\n", check);
-            return false;
-        }
-        //multiply ratio * SPLICE_FRAME to find final ratio
-        for (i = 0; i < 4; i++) sendRatio[i] = (int) (srcRatio[i] * SPLICE_FRAME);
-        */
         if (!startedSplice) {
             for (i = 0; i < 4; i++) oldRatio[i] = sendRatio[i];
             startedSplice = true;
