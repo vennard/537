@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# usage: ./plot.sh <data file>
+# usage: ./plot.sh <data file> <output file>
 # 
 # outputs:
-#   out.svg - graph of data points and slope lines
-#   out.txt - data file containing all delay values with associated R values (10->100)
+#   <output file>.svg - graph of data points and slope lines
+#   <output file>.txt - data file containing all delay values with associated R values (10->100)
 #
 # note: may have to give permission using chmod a+x plot.sh
 
