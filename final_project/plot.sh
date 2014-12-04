@@ -9,13 +9,14 @@
 # note: may have to give permission using chmod a+x plot.sh
 
 FILE=$1
+OUTFILE=$2
 SLOPE_ARRAY=()
 DELAY_ARRAY=()
 
 echo Calculating max delay using file: $FILE 
-echo ECE537 ATeam Project Delay Values > out.txt
-echo John Vennard \& Jan Beran >> out.txt
-echo Input file: $FILE >> out.txt
+echo ECE537 ATeam Project Delay Values > $OUTFILE.txt
+echo John Vennard \& Jan Beran >> $OUTFILE.txt
+echo Input file: $FILE >> $OUTFILE.txt
 
 # Loop over each R value increment by 10
 for i in {10..100..10}; do
@@ -37,7 +38,7 @@ for i in {10..100..10}; do
         let k++
     done < $FILE
     echo MAX DELAY with R of $i = $DELAY
-    echo R = $i results in max delay = $DELAY ms >> out.txt
+    echo R = $i results in max delay = $DELAY ms >> $OUTFILE.txt
     DELAY_ARRAY+=($DELAY)
 done
 
@@ -47,7 +48,7 @@ gnuplot <<- EOF
     set ylabel "frame"
     set term svg 
     set nokey
-    set output "out.svg"
+    set output "$OUTFILE.svg"
     F1(x) = ${SLOPE_ARRAY[0]} * (x - ${DELAY_ARRAY[0]})
     F2(x) = ${SLOPE_ARRAY[1]} * (x - ${DELAY_ARRAY[1]})
     F3(x) = ${SLOPE_ARRAY[2]} * (x - ${DELAY_ARRAY[2]})
