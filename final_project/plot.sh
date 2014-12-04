@@ -3,7 +3,7 @@
 # usage: ./plot.sh <data file>
 # 
 # outputs:
-#   out.pdf - graph of data points and slope lines
+#   out.svg - graph of data points and slope lines
 #   out.txt - data file containing all delay values with associated R values (10->100)
 #
 # note: may have to give permission using chmod a+x plot.sh
@@ -45,9 +45,9 @@ gnuplot <<- EOF
     set yrange [0:*]
     set xlabel "ms"
     set ylabel "frame"
-    set term pdf 
+    set term svg 
     set nokey
-    set output "out.pdf"
+    set output "out.svg"
     F1(x) = ${SLOPE_ARRAY[0]} * (x - ${DELAY_ARRAY[0]})
     F2(x) = ${SLOPE_ARRAY[1]} * (x - ${DELAY_ARRAY[1]})
     F3(x) = ${SLOPE_ARRAY[2]} * (x - ${DELAY_ARRAY[2]})
