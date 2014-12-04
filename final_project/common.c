@@ -253,8 +253,8 @@ void dprintPkt(unsigned char* pkt, unsigned int pktLen, bool isTx) {
         dirStr = "Rx";
     }
 
-    dprintf("%s packet: TYPE=%s, SRC=%u, DST=%u, SEQ=%u, SIZE=%u\n",
-            dirStr, typeStr, hdr->src, hdr->dst, hdr->seq, pktLen);
+    //dprintf("%s packet: TYPE=%s, SRC=%u, DST=%u, SEQ=%u, SIZE=%u\n",
+     //       dirStr, typeStr, hdr->src, hdr->dst, hdr->seq, pktLen);
 }
 
 unsigned int rateToDelay(unsigned int rate) {    

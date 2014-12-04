@@ -99,7 +99,7 @@ bool bufAdd(uint32_t seq, unsigned char* data) {
             dprintf("Warning: attempt to insert pkt already present in the buffer, seq=%u\n", seq);
             return true;
         default:
-            dprintf("Packet Inserted in the buffer, seq=%u index=%d\n", seq, index);
+            //dprintf("Packet Inserted in the buffer, seq=%u index=%d\n", seq, index);
             break;
     }
 
