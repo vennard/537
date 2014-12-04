@@ -33,7 +33,7 @@
 /*******************
  * Critical Variables
  *******************/
-#define SPLICE_DELAY 500 //time between calculating splice ratios
+#define SPLICE_DELAY 1000 //time between calculating splice ratios
 #define SPLICE_FRAME 100  //controls resolution of splice ratio from servers
 #define SPLICE_THRESH 15  //TODO threshold of change needed to send update
 #define SPLICE_GAP 200 // + last received packet syncs splice changeover at servers
