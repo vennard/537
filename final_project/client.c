@@ -93,11 +93,14 @@ int main(int argc, char *argv[]) {
 
     // clean up resources and plot 
     close(soc);
+    printf("Ending program\n");
+    /*
     if (plotGraph() == false) {
         printf("Warning: Graph could not be plotted\n");
     } else {
         printf("Data successfully calculated up to packet %i: see out.pdf and out.txt\n",lastPkt);
     }
+    */
 
     return 0;
 }
