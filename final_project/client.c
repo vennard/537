@@ -146,7 +146,7 @@ bool checkRateLost(void) { // adjust tx rates
                     return false;
                 }
                 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
-                dprintPkt(pktOut, PKTLEN_MSG, true);
+                //dprintPkt(pktOut, PKTLEN_MSG, true);
             }
         } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate + 2 <= RATE_MAX)) {
             currTxRate += 2;
@@ -157,7 +157,7 @@ bool checkRateLost(void) { // adjust tx rates
                     return false;
                 }
                 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
-                dprintPkt(pktOut, PKTLEN_MSG, true);
+                //dprintPkt(pktOut, PKTLEN_MSG, true);
             }
         }
     }
