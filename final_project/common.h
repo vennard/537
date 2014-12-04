@@ -33,9 +33,9 @@
 /*******************
  * Critical Variables
  *******************/
-#define SPLICE_DELAY 10000 //time between calculating splice ratios
+#define SPLICE_DELAY 1000 //time between calculating splice ratios
 #define SPLICE_FRAME 100  //controls resolution of splice ratio from servers
-#define SPLICE_THRESH 5  //TODO threshold of change needed to send update
+#define SPLICE_THRESH 10  //TODO threshold of change needed to send update
 #define SPLICE_GAP 200 // + last received packet syncs splice changeover at servers
 #define SPLICE_IGNORE_THRESH 20 //threshold for excluding node from splice ack
 //above is 1/value for percentage of splice ratio to fall below to ignore
@@ -66,7 +66,7 @@
 #define BUF_MIN_OCCUP 0.3   // minimum intended rx buffer occupancy (ratio <0,1>)
 #define BUF_SIZE 1000       // size (pkts) of the packet buffer (in client)
 #define BUF_LOST_THRSH 100  // missing packets older than seq=(newest seq)-LOST_THRSH are considered as lost 
-#define BUF_CHECK_TIME 1000000 // time (usecs) between subsequent buffer flushes, rate adjustments, missing packet requests 
+#define BUF_CHECK_TIME 100000 // time (usecs) between subsequent buffer flushes, rate adjustments, missing packet requests 
 
 /*******************
  * Packet Headers
