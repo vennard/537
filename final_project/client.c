@@ -43,7 +43,7 @@ bool startedSplice = false;
 bool ackdNewRatios = true;
 static bool ackdRatio[4] = {[0 ... 3] = false};
 static int lastPkt = 0;
-static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
+//static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
 FILE* graphDataFile;
 static pthread_mutex_t bufMutex;
 
@@ -108,7 +108,6 @@ bool checkRateLost(void) { // adjust tx rates
     dprintf("bufOc = %f\n",bufOc);
     if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
         //TODO added code
-        /*
         if (bufOc > BUF_MAX_OCCUP) {
             int selServer = restrictServer();
             if (selServer == -1) { //send to all
@@ -134,8 +133,8 @@ bool checkRateLost(void) { // adjust tx rates
                 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[selServer], sizeof (server[selServer]));
             }
         }
-        */
         //TODO end 
+        /*
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
             currTxRate /= 2; dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
             // broadcast decrease rate request to all servers
@@ -158,6 +157,7 @@ bool checkRateLost(void) { // adjust tx rates
                 dprintPkt(pktOut, PKTLEN_MSG, true);
             }
         }
+        */
     }
 
     // request lost packets
