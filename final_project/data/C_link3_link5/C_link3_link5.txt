@@ -1,0 +1,13 @@
+ECE537 ATeam Project Delay Values
+John Vennard & Jan Beran
+Input file: data/C_link3_link5/C_link3_link5.data
+R = 10 results in max delay = 200 ms
+R = 20 results in max delay = 250 ms
+R = 30 results in max delay = 267 ms
+R = 40 results in max delay = 275 ms
+R = 50 results in max delay = 280 ms
+R = 60 results in max delay = 284 ms
+R = 70 results in max delay = 286 ms
+R = 80 results in max delay = 288 ms
+R = 90 results in max delay = 289 ms
+R = 100 results in max delay = 21740 ms
