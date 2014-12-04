@@ -217,7 +217,7 @@ bool rxSplice(int soc, struct sockaddr_in* client) {
 
     //check valid sequence number
     if (sseq <= seq) {
-        printf("ERROR: sseq number below current seq number\n");
+        printf("ERROR: sseq (%i) number below current seq (%i) number\n",sseq,seq);
         return false;
     }
 
