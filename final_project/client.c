@@ -114,8 +114,8 @@ bool checkRateLost(void) {
                 sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
                 dprintPkt(pktOut, PKTLEN_MSG, true);
             }
-        } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate * 2 <= RATE_MAX)) {
-            currTxRate *= 2;
+        } else if ((bufOc < BUF_MIN_OCCUP) && (currTxRate + 2 <= RATE_MAX)) {
+            currTxRate += 2;
             dprintf("Increased desired tx rate, RATE=%u\n", currTxRate);
             // broadcast increase rate request to all servers
             for (int i = 0; i < 4; i++) {
