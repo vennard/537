@@ -21,6 +21,7 @@
 
     unsigned int debugMisSeq = 0;
     struct timeval tvTest1, tvTest2;
+int currRate[4] = {[0 ... 3] = RATE_MAX};
 /* Variable Declarations */
 static char *saddr[4]; //server ip addresses
 static struct sockaddr_in server[4];
@@ -42,7 +43,7 @@ bool startedSplice = false;
 bool ackdNewRatios = true;
 static bool ackdRatio[4] = {[0 ... 3] = false};
 static int lastPkt = 0;
-static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
+//static unsigned int currTxRate = RATE_MAX; // server tx rate currently set
 FILE* graphDataFile;
 static pthread_mutex_t bufMutex;
 
@@ -56,6 +57,8 @@ bool spliceRatio(int rxLen);
 bool reqFile(char** filename);
 bool receiveMovie();
 bool calcSplice();
+int restrictServer();
+int increaseServer();
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigintHandler);
@@ -99,11 +102,39 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-bool checkRateLost(void) {
-    // adjust tx rates
+//TODO changing to decrease send rates depending on splice ratio
+bool checkRateLost(void) { // adjust tx rates
     double bufOc = bufGetOccupancy();
     dprintf("bufOc = %f\n",bufOc);
     if ((bufOc > BUF_MAX_OCCUP) || (bufOc < BUF_MIN_OCCUP)) {
+        //TODO added code
+        if (bufOc > BUF_MAX_OCCUP) {
+            int selServer = restrictServer();
+            if (selServer == -1) { //send to all
+                for (int i = 0; i < 4; i++) {
+                    if (currRate[i] >= 2) {
+                        currRate[i] /= 2;
+                        if (fillpkt(pktOut, ID_CLIENT, i, TYPE_RATE, currRate[i], 0, 0) == false) return false;
+                        sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[i], sizeof (server[i]));
+                    }
+                }
+            } else { //send to one server
+                if (currRate[selServer] >= 2) {
+                    currRate[selServer] /= 2;
+                    if (fillpkt(pktOut, ID_CLIENT, selServer, TYPE_RATE, currRate[selServer], 0, 0) == false) return false;
+                    sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[selServer], sizeof (server[selServer]));
+                }
+            }
+        } else if (bufOc < BUF_MIN_OCCUP) {
+            int selServer = increaseServer();
+            if (selServer != -1) {
+                currRate[selServer] += 2;
+                if (fillpkt(pktOut, ID_CLIENT, selServer, TYPE_RATE, currRate[selServer], 0, 0) == false) return false;
+                sendto(soc, pktOut, PKTLEN_MSG, 0, (struct sockaddr*) &server[selServer], sizeof (server[selServer]));
+            }
+        }
+        //TODO end 
+        /*
         if ((bufOc > BUF_MAX_OCCUP) && (currTxRate >= 2)) {
             currTxRate /= 2; dprintf("Decreased desired tx rate, RATE=%u\n", currTxRate);
             // broadcast decrease rate request to all servers
@@ -126,6 +157,7 @@ bool checkRateLost(void) {
                 dprintPkt(pktOut, PKTLEN_MSG, true);
             }
         }
+        */
     }
 
     // request lost packets
@@ -527,4 +559,87 @@ char* checkArgs(int argc, char *argv[]) {
     saddr[2] = argv[3];
     saddr[3] = argv[4];
     return filename;
+}
+
+//returns -1 if no server can be increased, otherwise returns most restricted server
+int increaseServer() {
+    int temp = RATE_MAX;
+    int server = -1;
+    for (int i = 0;i < 4;i++) {
+        if (currRate[i] < temp) {
+            temp = currRate[i];
+            server = i;
+        }
+    }
+    return server;
+}
+/*
+ * Rate adjustment based on current rates and current restrictions
+ *
+ * Slowest rate gets 0 points, highest is 3, tied get rnd value
+ * Most restrictions gets 0 points, least gets 3, tied get rnd value
+ *
+ * Reduce rate of server with highest total
+ *
+ */
+int restrictServer() {
+    int ratesP[4] = {};
+    int restP[4] = {};
+    int tempA = 0;
+    int tempB = 0;
+    int a[4], b[4];
+    //find max values
+    for (int i = 0;i < 4;i++) {
+        if (srcpkts[i] > tempA) {
+            a[0] = i;
+            tempA = srcpkts[i];
+        }
+        if (currRate[i] > tempB) {
+            b[0] = i;
+            tempB = currRate[i];
+        }
+    }
+    ratesP[a[0]] = 3; 
+    restP[b[0]] = 3; 
+    tempA = 0;
+    tempB = 0;
+    for (int i = 0;i < 4;i++) {
+        if ((a[0] != i) && (srcpkts[i] > tempA)) {
+            a[1] = i;
+            tempA = srcpkts[i];
+        }
+        if ((b[0] != i) && (currRate[i] > tempB)) {
+            b[1] = i;
+            tempB = currRate[i];
+        }
+    }
+    ratesP[a[1]] = 2; 
+    restP[b[1]] = 2; 
+    tempA = 0;
+    tempB = 0;
+    for (int i = 0;i < 4;i++) {
+        if ((a[0] != i) && (a[1] != i) && (srcpkts[i] > tempA)) {
+            a[2] = i;
+            tempA = srcpkts[i];
+        }
+        if ((b[0] != i) && (b[1] != i) && (currRate[i] > tempB)) {
+            b[2] = i;
+            tempB = currRate[i];
+        }
+    }
+    ratesP[a[2]] = 1; 
+    restP[b[2]] = 1; 
+    int totals[4] = {};
+    //Calculate final values
+    for (int i = 0;i < 4;i++) totals[i] = ratesP[i] + restP[i];
+    //find max value
+    tempA = 0;
+    int server = -1;
+    for (int i = 0;i < 4;i++) {
+        if (totals[i] > tempA) {
+            server = i;
+            tempA = totals[i];
+        }
+    }
+    return server; //default is -1 which means restrict all
 }
